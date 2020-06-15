@@ -44,15 +44,16 @@ path_t* tsp_solve(tsp_t* instance)
 	while (queue->length)
 	{
 		path_t* p = queue_pop(queue);
-		printf("FUCK OFF\n");
-		path_print(p);
-		printf("FUCK OFF\n");
 
-		if (p->length == SOLUTION_MIN_LENGTH && p->cost < optimal->cost)
+		if (p->length == SOLUTION_MIN_LENGTH)
 		{
-			if (optimal)
-				path_del(optimal);
-			optimal = path_copy(p);
+			if (!optimal)
+				optimal = path_cpy(p);
+			else if (p->cost < optimal->cost)
+				{
+					path_del(optimal);
+					optimal = path_cpy(p);
+				}
 		}
 
 		uint* children = path_children(p);
@@ -99,10 +100,22 @@ path_t* path_new(path_t* p, uint x)
 	}
 	else
 	{
-		q->length = q->cost = 1u;
+		q->length = 1u;
+		q->cost = 0u;
 		q->nodes = malloc(sizeof(uint));
 		q->nodes[0] = x;
 	}
+	return q;
+}
+
+path_t* path_cpy(path_t* p)
+{
+	path_t* q = malloc(sizeof(path_t));
+	q->length = p->length;
+	q->cost = p->cost;
+	q->nodes = malloc(q->length * sizeof(uint));
+	for (uint i = 0u; i < q->length; i++)
+		q->nodes[i] = p->nodes[i];
 	return q;
 }
 
@@ -115,25 +128,18 @@ void path_del(path_t* p)
 void path_print(path_t* p)
 {
 	for (uint i = 0; i < p->length; i++)
-		printf("%u%s", p->nodes[i], (i < p->length - 1 ? ", " : ""));
+		printf("%u%s", p->nodes[i], (i < p->length - 1 ? " " : ""));
 	printf("\n");
-}
-
-path_t* path_copy(path_t* p)
-{
-	path_t* q = malloc(sizeof(path_t));
-	q->length = p->length;
-	q->cost = p->cost;
-	q->nodes = malloc(q->length * sizeof(uint));
-	for (uint i = 0u; i < q->length; i++)
-		q->nodes[i] = p->nodes[i];
-	return q;
 }
 
 uint* path_children(path_t* p)
 {
 	if (p->length > _global_order)
-		return NULL;
+	{
+		uint* children = malloc(sizeof(uint));
+		children[0] = UINT_MAX;
+		return children;
+	}
 	else if (p->length == _global_order)
 	{
 		uint* children = malloc(2 * sizeof(uint));
@@ -160,102 +166,3 @@ uint* path_children(path_t* p)
 		return children;
 	}
 }
-
-// uint** cost;
-// uint tsp_solve_recursive(uint i, uint* v);
-// uint setlen(uint* s);
-// void setsub(uint* s, uint* t, uint i);
-// void setprint(uint* s);
-//
-// uint tsp_solve_recursive(uint i, uint* v)
-// {
-// 	printf("f(i = %d, V = ", i);
-// 	setprint(v);
-// 	printf(")\n");
-//
-// 	if (setlen(v) == 1u)
-// 	{
-// 		uint j = v[0];
-// 		return cost[i][j] + cost[j][0];
-// 	}
-// 	uint min_cost = UINT_MAX, mink = UINT_MAX;
-// 	for (uint* k = v; *k != -1u; k++)
-// 	{
-// 		uint w[setlen(v)];
-// 		setsub(w, v, *k); // W = V - {k}
-// 		uint kcost = cost[i][*k] + tsp_solve_recursive(*k, w);
-// 		if (kcost < min_cost)
-// 		{
-// 			min_cost = kcost;
-// 			mink = *k;
-// 		}
-// 	}
-// 	printf("mink = %u\n", mink);
-// 	return min_cost;
-// }
-//
-// uint setlen(uint* s)
-// {
-// 	uint* t = s;
-// 	while (*t++ != -1u)
-// 		;
-// 	return t - s - 1u;
-// }
-//
-// void setsub(uint* s, uint* t, uint i)
-// {
-// 	while (*t != -1u)
-// 	{
-// 		if (*t != i)
-// 			*s++ = *t;
-// 		t++;
-// 	}
-// 	*s = -1u;
-// }
-//
-// void setprint(uint* s)
-// {
-// 	printf("{");
-// 	int first = 1;
-// 	while (*s != -1u)
-// 	{
-// 		if (first)
-// 		{
-// 			printf("%u", *s);
-// 			first = 0;
-// 		}
-// 		else
-// 			printf(", %u", *s);
-// 		s++;
-// 	}
-// 	printf("}");
-// }
-//
-// // extern problem_t problem;
-// //
-// // tsp_solution_t f(node_t i, set_t v)
-// // {
-// //   if (set_size(v) > 1)
-// //   {
-// //     return min{c[i][k] + f(k, v - {k}), for k in v};
-// //   }
-// //   else
-// //   {
-// //     j = v[0]
-// //     return {
-// //       cost = c[i][j] + c[j][0]
-// //       path = {i, j, 0}
-// //     }
-// //   }
-// // }
-// //
-// // void foo(void)
-// // {
-// //   solution s;
-// //   queue_t q;
-// //   while(!queue_empty(q))
-// //   {
-// //     x = queue_pop(q);
-// //
-// //   }
-// // }

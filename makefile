@@ -1,21 +1,28 @@
 .DEFAULT_GOAL := build
 .PHONY: build clean
-.workdir := $(CURDIR)
-.root := $(shell dirname '$(abspath $(lastword $(MAKEFILE_LIST)))')
-.rootr := $(shell realpath --relative-to '$(.workdir)' '$(.root)')
-.bin := $(.root)/.bin
-.binr := $(shell realpath --relative-to '$(.workdir)' '$(.bin)')
 
-build: $(.bin)/tsp.seq.rec
+build: pcv arquivo-entrada.txt
 
-$(.bin)/tsp.seq.rec: $(.root)/main.c $(.rootr)/tsp.c | $(.bin)
-	gcc $(.rootr)/main.c $(.rootr)/tsp.c -o $(.binr)/tsp.seq.rec -Wall
+pcv: .bin/tsp
+	ln -sf ./.bin/tsp pcv
 
-$(.bin)/tsp: $(.root)/main.c | $(.bin)
-	mpicc $(.rootr)/main.c -o $(.binr)/tsp -Wall
+.bin/tsp: .bin/queue.o .bin/tsp.o .bin/main.o | .bin
+	mpicc .bin/queue.o .bin/tsp.o .bin/main.o -o .bin/tsp
 
-$(.bin):
-	mkdir -p $(.binr)
+.bin/queue.o: queue.h queue.c | .bin
+	mpicc -c queue.c -o .bin/queue.o -Wall
+
+.bin/tsp.o: tsp.h tsp.c | .bin
+	mpicc -c tsp.c -o .bin/tsp.o -Wall
+
+.bin/main.o: main.c | .bin
+	mpicc -c main.c -o .bin/main.o -Wall
+
+.bin:
+	mkdir -p .bin
+
+arquivo-entrada.txt: __problems__/4/0
+	ln -sf ./__problems__/4/0 arquivo-entrada.txt
 
 clean:
-	rm -rf $(.binr)
+	rm -rf .bin

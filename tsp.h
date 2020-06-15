@@ -29,9 +29,9 @@ void tsp_del(tsp_t* instance);
 path_t* tsp_solve(tsp_t* instance);
 
 path_t* path_new(path_t* p, uint x);
+path_t* path_cpy(path_t* p);
 void path_del(path_t* p);
 void path_print(path_t* p);
-path_t* path_copy(path_t* p);
 uint* path_children(path_t* p);
 
 #endif
