@@ -1,5 +1,6 @@
 #ifndef __TSP_H__
 #define __TSP_H__
+#include <stdio.h>
 #include "queue.h"
 
 typedef unsigned int uint;
@@ -24,7 +25,7 @@ struct path
 };
 typedef struct path path_t;
 
-tsp_t* tsp_new(char* filename);
+tsp_t* tsp_new(FILE* file);
 void tsp_del(tsp_t* instance);
 path_t* tsp_solve(tsp_t* instance);
 

@@ -1,8 +1,17 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include "tsp.h"
+
+const int MASTER_RANK = 0;
+tsp_t* input(int argc, char** argv);
 
 int main(int argc, char** argv)
 {
+	if (my_rank == MASTER_RANK)
+	{
+		tsp_t* problem = input(argc, argv);
+	}
+
 	// --- PSEUDOCODE ---
 	// if (my_rank == MPI_MASTER)
 	// {
@@ -48,21 +57,6 @@ int main(int argc, char** argv)
 	// }
 	// --- PSEUDOCODE ---
 
-	/** Handle argc and argv */
-	if (argc != 2)
-	{
-		fprintf(stderr, "Usage: %s input-file.txt\n", argv[0]);
-		return 1;
-	}
-
-	/** Read the TSP from "input-file.txt" */
-	tsp_t* problem = tsp_new(argv[1]);
-	if (!problem)
-	{
-		fprintf(stderr, "Failed to open file \"%s\" in reading mode\n", argv[1]);
-		return 1;
-	}
-
 	/** Solve this instance of the TSP */
 	path_t* solution = tsp_solve(problem);
 
@@ -75,4 +69,26 @@ int main(int argc, char** argv)
 	tsp_del(problem);
 
 	return 0;
+}
+
+tsp_t* input(int argc, char** argv)
+{
+	/** Handle argc and argv */
+	if (argc != 2)
+	{
+		fprintf(stderr, "Usage: %s input-file.txt\n", argv[0]);
+		exit(1);
+	}
+
+	/** Read the TSP from "input-file.txt" */
+	FILE* input_file = fopen(argv[1], "r");
+	if (!input_file)
+	{
+		fprintf(stderr, "Failed to open file \"%s\" in reading mode\n", argv[1]);
+		exit(1);
+	}
+	tsp_t* problem = tsp_new(input_file);
+	fclose(input_file);
+
+	return problem;
 }

@@ -30,7 +30,17 @@ for line in $($mpiexec nproc); do
   ncores[$rank]="$(echo "$line" | sed -E 's/^\[[0-9]+,[0-9]+\]<stdout>:(.*)$/\1/')"
 done
 
-echo -e "RANK\tNODE\tCPU\t\t\t\t\tNCORES"
+meminfo_bash="cat /proc/meminfo | grep MemTotal | cut -d: -f2 | awk '$2==\"kB\"{if ($1>1024^2){$1=$1/1024^2;$2=\"GB\";} else if ($2>1024){$1=$1/1024;$2=\"MB\";}} 1'"
+meminfos="$($mpiexec bash -c "$meminfo_bash")"
+mems=()
+OLDIFS=$IFS; IFS=$'\n'
+for line in $meminfos; do
+  rank="$(echo "$line" | sed -E 's/^\[[0-9]+,([0-9]+)\].*$/\1/')"
+  mems[$rank]="$(echo "$line" | sed -E 's/^\[[0-9]+,[0-9]+\]<stdout>:(.*)$/\1/')"
+done
+IFS=$OLDIFS
+
+echo -e "RANK\tNODE\tCPU\t\t\t\t\tNCORES\tRAM"
 for rank in $(seq 0 12); do
-  echo -e "$(printf %02d "$rank")\t${nodes[$rank]}\t${cpus[$rank]}\t${ncores[$rank]}"
+  echo -e "$(printf %02d "$rank")\t${nodes[$rank]}\t${cpus[$rank]}\t${ncores[$rank]}\t${mems[$rank]}"
 done

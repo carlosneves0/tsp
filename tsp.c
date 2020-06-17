@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
 #include "tsp.h"
@@ -7,11 +6,8 @@
 uint _global_order;
 uint** _global_cost;
 
-tsp_t* tsp_new(char* filename)
+tsp_t* tsp_new(FILE* file)
 {
-	FILE* file = fopen(filename, "r");
-	if (!file)
-		return NULL;
 	tsp_t* instance = (tsp_t*) malloc(sizeof(tsp_t));
 	fscanf(file, "%u\n", &instance->order);
 	instance->cost = (uint**) malloc(instance->order * sizeof(uint*));
