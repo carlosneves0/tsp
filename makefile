@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := build
-.PHONY: build clean
+.PHONY: build clean cluster-topology
 
 build: pcv arquivo-entrada.txt
 
@@ -21,8 +21,11 @@ pcv: .bin/tsp
 .bin:
 	mkdir -p .bin
 
-arquivo-entrada.txt: __problems__/4/0
-	ln -sf ./__problems__/4/0 arquivo-entrada.txt
+arquivo-entrada.txt: __problems__/0/input
+	ln -sf ./__problems__/0/input arquivo-entrada.txt
 
 clean:
 	rm -rf .bin
+
+cluster-topology:
+	bash __scripts__/cluster-topology.bash
