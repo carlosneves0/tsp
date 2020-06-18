@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := build
-.PHONY: build clean cluster-topology
+.PHONY: build clean exec cluster-topology
 
 build: pcv arquivo-entrada.txt
 
@@ -26,6 +26,9 @@ arquivo-entrada.txt: __problems__/0/input
 
 clean:
 	rm -rf .bin
+
+exec: .bin/tsp
+	mpiexec --hostfile nodes.txt --map-by ppr:1:node .bin/tsp
 
 cluster-topology:
 	bash __scripts__/cluster-topology.bash
