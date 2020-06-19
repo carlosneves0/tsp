@@ -1,16 +1,16 @@
 .DEFAULT_GOAL := build
-.PHONY: build clean exec cluster-topology
+.PHONY: build clean exec _exec cluster-topology
 
 build: pcv arquivo-entrada.txt
 
 pcv: .bin/tsp
 	ln -sf ./.bin/tsp pcv
 
-.bin/tsp: .bin/queue.o .bin/tsp.o .bin/main.o | .bin
-	mpicc .bin/queue.o .bin/tsp.o .bin/main.o -o .bin/tsp
+.bin/tsp: .bin/debug.o .bin/tsp.o .bin/main.o | .bin
+	mpicc .bin/debug.o .bin/tsp.o .bin/main.o -o .bin/tsp -fopenmp
 
-.bin/queue.o: queue.h queue.c | .bin
-	mpicc -c queue.c -o .bin/queue.o -Wall
+.bin/debug.o: debug.h debug.c | .bin
+	mpicc -c debug.c -o .bin/debug.o -Wall
 
 .bin/tsp.o: tsp.h tsp.c | .bin
 	mpicc -c tsp.c -o .bin/tsp.o -Wall
@@ -27,8 +27,11 @@ arquivo-entrada.txt: __problems__/0/input
 clean:
 	rm -rf .bin
 
-exec: .bin/tsp
-	mpiexec --hostfile nodes.txt --map-by ppr:1:node .bin/tsp
+exec: nodes.txt .bin/tsp arquivo-entrada.txt
+	mpiexec --map-by ppr:1:node --hostfile nodes.txt .bin/tsp arquivo-entrada.txt
+
+_exec: .bin/tsp arquivo-entrada.txt
+	mpiexec --np 3 --oversubscribe .bin/tsp arquivo-entrada.txt
 
 cluster-topology:
 	bash __scripts__/cluster-topology.bash

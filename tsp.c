@@ -1,164 +1,108 @@
 #include <stdlib.h>
-#include <limits.h>
 #include "tsp.h"
-#include "queue.h"
 
-uint _global_order;
-uint** _global_cost;
-
-tsp_t* tsp_new(FILE* file)
+tsp_t* tsp_new(FILE* stream)
 {
-	tsp_t* instance = (tsp_t*) malloc(sizeof(tsp_t));
-	fscanf(file, "%u\n", &instance->order);
-	instance->cost = (uint**) malloc(instance->order * sizeof(uint*));
-	for (uint i = 0u; i < instance->order; i++)
+	tsp_t* problem = (tsp_t*) malloc(sizeof(tsp_t));
+
+	fscanf(stream, "%d\n", &problem->n);
+	const int N = problem->n;
+
+	problem->cost = (int**) malloc(N * sizeof(int*));
+	for (int i = 0; i < N; i++)
 	{
-		instance->cost[i] = (uint*) malloc(instance->order * sizeof(uint));
-		for (uint j = 0u; j < instance->order; j++)
-			fscanf(file, "%u", &instance->cost[i][j]);
+		problem->cost[i] = (int*) malloc(N * sizeof(int));
+		for (int j = 0; j < N; j++)
+			fscanf(stream, "%d", &problem->cost[i][j]);
 	}
-	return instance;
+
+	return problem;
 }
 
-void tsp_del(tsp_t* instance)
+void tsp_del(tsp_t* problem)
 {
-	for (uint i = 0u; i < instance->order; i++)
-		free(instance->cost[i]);
-	free(instance->cost);
-	free(instance);
+	for (int i = 0; i < problem->n; i++)
+		free(problem->cost[i]);
+	free(problem->cost);
+	free(problem);
 }
 
-path_t* tsp_solve(tsp_t* instance)
+// void tsp_fprint(FILE* stream, tsp_t* problem)
+// {
+// 	const int N = problem->n;
+// 	for (int i = 0; i < N; i++)
+// 	{
+// 		for (int j = 0; j < N; j++)
+// 			fprintf(stream, "%d%s", problem->cost[i][j], (j < N-1 ? " " : ""));
+// 		fprintf(stream, "\n");
+// 	}
+// 	fflush(stream);
+// }
+
+tsp_message_t* tsp_encode(tsp_t* problem)
 {
-	_global_order = instance->order;
-	_global_cost = instance->cost;
-	const uint INITIAL_NODE = 0u;
-	const uint SOLUTION_MIN_LENGTH = instance->order + 1u;
+	// 1 int for n
+	// n*n int's for cost
+	tsp_message_t* message = (tsp_message_t*) malloc(sizeof(tsp_message_t));
 
-	path_t* optimal = NULL;
-	queue_t* queue = queue_new(path_new(NULL, INITIAL_NODE));
-	while (queue->length)
-	{
-		path_t* p = queue_pop(queue);
+	const int N = problem->n;
 
-		if (p->length == SOLUTION_MIN_LENGTH)
-		{
-			if (!optimal)
-				optimal = path_cpy(p);
-			else if (p->cost < optimal->cost)
-				{
-					path_del(optimal);
-					optimal = path_cpy(p);
-				}
-		}
+	message->count = 1 + N*N;
 
-		uint* children = path_children(p);
-		for (uint* k = children; *k != UINT_MAX; k++)
-			queue_push(queue, path_new(p, *k));
+	message->buffer = (int*) malloc(message->count * sizeof(int));
 
-		path_del(p);
-	}
-	queue_del(queue);
-	_global_cost = NULL;
-	_global_order = UINT_MAX;
-	return optimal;
-	// ---
-	// cost = instance->cost;
-	//
-	// uint v[instance->order];
-	// for (uint i = 0u; i < instance->order; i++)
-	// 	v[i] = i + 1u;
-	// v[instance->order - 1u] = -1u;
-	//
-	// // setprint(v);
-	// // uint w[instance->order - 1u];
-	// // setsub(w, v, 2u);
-	// // setprint(w);
-	// //
-	// // return 0u;
-	// return tsp_solve_recursive(0u, v);
+	message->buffer[0] = N;
+
+	int offset = 1;
+	for (int i = 0; i < N; i++)
+		for (int j = 0; j < N; j++)
+			message->buffer[offset + (i*N + j)] = problem->cost[i][j];
+
+	return message;
 }
 
-path_t* path_new(path_t* p, uint x)
+tsp_t* tsp_decode(tsp_message_t* message)
 {
-	path_t* q = malloc(sizeof(path_t));
-	if (p)
-	{
-		q->length = p->length + 1u;
+	tsp_t* problem = (tsp_t*) malloc(sizeof(tsp_t));
 
-		uint p_back = p->nodes[p->length - 1];
-		q->cost = p->cost + _global_cost[p_back][x];
+	problem->n = message->buffer[0];
+	const int N = problem->n;
 
-		q->nodes = malloc(q->length * sizeof(uint));
-		for (uint i = 0u; i < p->length; i++)
-		q->nodes[i] = p->nodes[i];
-		q->nodes[q->length - 1] = x;
-	}
-	else
+	int offset = 1;
+	problem->cost = (int**) malloc(N * sizeof(int*));
+	for (int i = 0; i < N; i++)
 	{
-		q->length = 1u;
-		q->cost = 0u;
-		q->nodes = malloc(sizeof(uint));
-		q->nodes[0] = x;
+		problem->cost[i] = (int*) malloc(N * sizeof(int));
+		for (int j = 0; j < N; j++)
+			problem->cost[i][j] = message->buffer[offset + (i*N + j)];
 	}
-	return q;
+
+	return problem;
 }
 
-path_t* path_cpy(path_t* p)
+void tsp_message_del(tsp_message_t* message)
 {
-	path_t* q = malloc(sizeof(path_t));
-	q->length = p->length;
-	q->cost = p->cost;
-	q->nodes = malloc(q->length * sizeof(uint));
-	for (uint i = 0u; i < q->length; i++)
-		q->nodes[i] = p->nodes[i];
-	return q;
+	free(message->buffer);
+	free(message);
 }
 
-void path_del(path_t* p)
+char* tsp_message_buffer_to_string(tsp_message_t* message)
 {
-	free(p->nodes);
-	free(p);
-}
+	const int count = message->count;
+	const int* buffer = message->buffer;
+	static const int MAX_INT_LENGTH = 8;
+	char* string = malloc(2 + count*MAX_INT_LENGTH + 1); // "[1,2,3,4]\0"
 
-void path_print(path_t* p)
-{
-	for (uint i = 0; i < p->length; i++)
-		printf("%u%s", p->nodes[i], (i < p->length - 1 ? " " : ""));
-	printf("\n");
-}
+	char* s = string;
+	s += sprintf(s, "[");
+	for (int i = 0; i < count; i++)
+		s += sprintf(s, "%d%s", buffer[i], (i < count-1 ? "," : ""));
+	s += sprintf(s, "]");
+	s[0] = '\0';
 
-uint* path_children(path_t* p)
-{
-	if (p->length > _global_order)
-	{
-		uint* children = malloc(sizeof(uint));
-		children[0] = UINT_MAX;
-		return children;
-	}
-	else if (p->length == _global_order)
-	{
-		uint* children = malloc(2 * sizeof(uint));
-		children[0] = 0u;
-		children[1] = UINT_MAX;
-		return children;
-	}
-	else
-	{
-		uint _children[_global_order], index = 0u;
-		for (uint i = 0u; i < _global_order; i++)
-		{
-			int visited = 0;
-			for (uint j = 0u; j < p->length; j++)
-				if (p->nodes[j] == i)
-					visited = 1;
-			if (!visited)
-				_children[index++] = i;
-		}
-		uint* children = malloc((index + 1) * sizeof(uint));
-		for (uint i = 0u; i < index; i++)
-			children[i] = _children[i];
-		children[index] = UINT_MAX;
-		return children;
-	}
+	// Try to free(string)...
+	// I know there will be memory leaks... but I just wanna be able to do:
+	// printf("foo %s bar", to_string(message));
+	// Is there a way to do this without memory leaks?
+	return string;
 }
