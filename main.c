@@ -82,40 +82,50 @@ void master(char* my_node, int my_ncores, tsp_t* problem)
 	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 	debug("[%s][%d] nproc = %d\n", my_node, my_rank, nproc);
 
-	/** Broadcast the cost matrix's order and data to each slave process. */
+	/**
+	 * Broadcast the cost matrix's order and data to each slave process.
+	 */
 	tsp_message_t* message = tsp_encode(problem); int count = 1;
 	MPI_Bcast(&message->count, count, MPI_INT, my_rank, MPI_COMM_WORLD);
-	debug("[%s][%d][bcast0::send] message->count = %d\n", my_node, my_rank, message->count);
+	debug("[%s][%d][bcast::send] message->count = %d\n", my_node, my_rank, message->count);
 
 	MPI_Bcast(message->buffer, message->count, MPI_INT, my_rank, MPI_COMM_WORLD);
-	debug("[%s][%d][bcast1::send] message->buffer = %s\n", my_node, my_rank, tsp_message_buffer_to_string(message));
+	debug("[%s][%d][bcast::send] message->buffer = %s\n", my_node, my_rank, tsp_message_buffer_to_string(message));
 
-	// /** Pre-compute smaller tasks that can be distributed to each node. */
-	// int initial_node = 0;	// "initial_city"
-	// tsp_search_state_t* initial = tsp_search_new(initial_node);
-	// const int PRE_COMPUTE_DEPTH = 2;
-	// tsp_search_state_t* expanded = tsp_search_expand(problem, initial, TSP_BREADTH_FIRST, PRE_COMPUTE_DEPTH);
-	// // NOTE: the cluster is homogeneous, i.e. all nodes are equipped with the
-	// //       same hardware. That's why we expand tasks of equal size and
-	// //       round-robin them to each process.
-	// // IDEA: calculate the "optimal pre-compute depth" using the size of the
-	// //       problem n and using information about the cluster topology.
-	// // THOUGHT: what if the cluster was heterogeneous?
-	//
-	// /** TODO: round-robin the list of tsp_search_node_t's to each process with a scatterv. */
+	/**
+	 * Pre-compute smaller tasks that can be distributed to each node.
+	 * NOTE: the cluster is homogeneous, i.e. all nodes are equipped with the
+	 *       same hardware. That's why we expand tasks of equal size and
+	 *       round-robin them to each process.
+	 * IDEA: calculate the "optimal pre-compute depth" using the size of the
+	 *       problem n and using information about the cluster topology.
+	 * THOUGHT: what if the cluster was heterogeneous?
+	*/
+	int initial_node = 0;	// "initial_city"
+	tsp_search_t* search = tsp_search_new(problem, initial_node);
+
+	int pre_compute_depth = 2;
+	tsp_search_expand(search, TSP_SEARCH_BREADTH_FIRST, pre_compute_depth);
+	debug("[%s][%d] search = %s\n", my_node, my_rank, tsp_search_to_string(search));
+
+	// /** Round-robin the list of tsp_search_node_t's to each process. */
 	// int size_of_encoded_tsp_search_state = ?;
 	// int size = size_of_encoded_tsp_search_state;
 	// int* all_tsp_search_states = malloc(?);
 	// for (search in expanded->list; rank in range(nproc))
 	// 	all_tsp_search_states[offsets[rank] + index*size] = tsp_search_encode(search);
 	// MPI_Scatterv(send: all_tsp_search_states, recv: my_tsp_search_states);
-	//
+
 	// tsp_solution_t* my_local_optimum = compute(problem, my_tsp_search_states);
 	//
 	// // TODO: encode a tsp_solution_t*
 	// tsp_solution_t* all_local_optima;
 	// MPI_Gather(recv: all_local_optima, send: my_local_optimum);
 
+	// global_optimum = merge(all_local_optima)
+	// print(global_optimum)
+
+	tsp_search_del(search);
 	tsp_message_del(message);
 	tsp_del(problem);
 }
@@ -125,22 +135,26 @@ void slave(int my_rank, char* my_node, int my_ncores)
 	/** Receive the TSP data from the master process. */
 	tsp_message_t message; int count = 1;
 	MPI_Bcast(&message.count, count, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
-	debug("[%s][%d][bcast0::recv] message.count = %d\n", my_node, my_rank, message.count);
+	debug("[%s][%d][bcast::recv] message.count = %d\n", my_node, my_rank, message.count);
 
 	message.buffer = (int*) malloc(message.count * sizeof(int));
 	MPI_Bcast(message.buffer, message.count, MPI_INT, MASTER_RANK, MPI_COMM_WORLD);
 	tsp_t* problem = tsp_decode(&message);
-	debug("[%s][%d][bcast1::recv] message.buffer = %s\n", my_node, my_rank, tsp_message_buffer_to_string(&message));
+	debug("[%s][%d][bcast::recv] message.buffer = %s\n", my_node, my_rank, tsp_message_buffer_to_string(&message));
 
-	// TODO: OMP part
+	// my_tsp_search_states = MPI_Scatterv()
+
 	// tsp_solution_t* my_local_optimum = compute(problem, my_tsp_search_states);
 
 	// TODO: encode a tsp_solution_t*
 	// MPI_Gather(recv: NULL, send: my_local_optimum);
+
+	tsp_del(problem);
 }
 
 // tsp_solution_t* compute(tsp_t* problem, ? my_tsp_search_states)
 // {
+// **OMP**
 // 	// TODO: alloc one search to one thread and go depth first.
 // 	return tsp_search_expand(problem, initial, TSP_DEPTH_FIRST, initial->problem->n);
 // }

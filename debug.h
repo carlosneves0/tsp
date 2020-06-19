@@ -7,8 +7,9 @@
 #define __DEBUG__ 1
 
 /**
- * Debug output goes to stderr.
- */
-void debug(const char* format, ...);
+* Debug macro to fprintf stuff to stderr.
+*/
+#define debug(fmt, ...) \
+	do { if (__DEBUG__) fprintf(stderr, fmt, __VA_ARGS__); } while (0)
 
 #endif

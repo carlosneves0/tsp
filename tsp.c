@@ -1,6 +1,11 @@
 #include <stdlib.h>
 #include "tsp.h"
 
+/*******************************************************************************
+ * tsp_t
+ * The data that describe an instance of the TSP.
+ ******************************************************************************/
+
 tsp_t* tsp_new(FILE* stream)
 {
 	tsp_t* problem = (tsp_t*) malloc(sizeof(tsp_t));
@@ -26,18 +31,6 @@ void tsp_del(tsp_t* problem)
 	free(problem->cost);
 	free(problem);
 }
-
-// void tsp_fprint(FILE* stream, tsp_t* problem)
-// {
-// 	const int N = problem->n;
-// 	for (int i = 0; i < N; i++)
-// 	{
-// 		for (int j = 0; j < N; j++)
-// 			fprintf(stream, "%d%s", problem->cost[i][j], (j < N-1 ? " " : ""));
-// 		fprintf(stream, "\n");
-// 	}
-// 	fflush(stream);
-// }
 
 tsp_message_t* tsp_encode(tsp_t* problem)
 {
@@ -79,6 +72,67 @@ tsp_t* tsp_decode(tsp_message_t* message)
 
 	return problem;
 }
+
+/*******************************************************************************
+ * tsp_search_t
+ * This struct describes the state a
+ ******************************************************************************/
+
+tsp_search_t* tsp_search_new(tsp_t* problem, int initial_node)
+{
+	tsp_search_t* search = (tsp_search_t*) malloc(sizeof(tsp_search_t));
+
+	search->problem = problem;
+
+	search->optimum = NULL;
+
+	tsp_search_node_t* root = (tsp_search_node_t*) malloc(sizeof(tsp_search_node_t));
+	root->depth = 0;
+	root->visited = (int*) malloc(sizeof(int));
+	root->visited[0] = initial_node;
+	const int N = problem->n;
+	root->unvisited = (int*) malloc((N-1) * sizeof(int));
+	for (int node = 0, index = 0; node < N; node++)
+		if (node != initial_node)
+			root->unvisited[index++] = node;
+	search->list = list_new((void*) root);
+
+	return search;
+}
+
+void tsp_search_del(tsp_search_t* search)
+{
+	list_del(search->list);
+	free(search);
+}
+
+char* tsp_search_to_string(tsp_search_t* search)
+{
+	// TODO: max_string_length = 128 characters
+	// TODO: sprintf(string, "{optimum = %s,", (search->optimum ? tsp_solution_to_string(search->optimum) : "NULL"));
+	// TODO: sprintf(string, "list = %s}", list_to_string(search->list));
+	// return string;
+	static const int STRING_MAX_LENGTH = 128;
+	char* string = (char*) malloc(STRING_MAX_LENGTH + 1);
+	
+	return NULL;
+}
+
+void tsp_search_expand(tsp_search_t* search, tsp_search_strategy_t strategy, int depth)
+{
+	if depth == -1
+		while (!list.empty())
+
+	while (depth--)
+	{
+		x = list
+	}
+}
+
+/*******************************************************************************
+ * tsp_message_t
+ * A generic data type that describes a message as a sequential block of int's.
+ ******************************************************************************/
 
 void tsp_message_del(tsp_message_t* message)
 {

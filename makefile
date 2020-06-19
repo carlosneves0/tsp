@@ -6,16 +6,16 @@ build: pcv arquivo-entrada.txt
 pcv: .bin/tsp
 	ln -sf ./.bin/tsp pcv
 
-.bin/tsp: .bin/debug.o .bin/tsp.o .bin/main.o | .bin
-	mpicc .bin/debug.o .bin/tsp.o .bin/main.o -o .bin/tsp -fopenmp
+.bin/tsp: .bin/list.o .bin/tsp.o .bin/main.o | .bin
+	mpicc .bin/list.o .bin/tsp.o .bin/main.o -o .bin/tsp -fopenmp
 
-.bin/debug.o: debug.h debug.c | .bin
-	mpicc -c debug.c -o .bin/debug.o -Wall
+.bin/list.o: list.h list.c | .bin
+	mpicc -c list.c -o .bin/list.o -Wall
 
 .bin/tsp.o: tsp.h tsp.c | .bin
 	mpicc -c tsp.c -o .bin/tsp.o -Wall
 
-.bin/main.o: main.c | .bin
+.bin/main.o: debug.h main.c | .bin
 	mpicc -c main.c -o .bin/main.o -Wall
 
 .bin:
