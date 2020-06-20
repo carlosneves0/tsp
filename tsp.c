@@ -35,8 +35,8 @@ void tsp_del(tsp_t* problem)
 
 message_t* tsp_encode(tsp_t* problem)
 {
-	// 1 int for n
-	// n*n int's for cost
+	// 1 int for tsp_t::n
+	// N*N ints for tsp_t::cost
 	message_t* message = (message_t*) malloc(sizeof(message_t));
 
 	const int N = problem->n;
@@ -221,3 +221,34 @@ void tsp_search_node_del(tsp_search_node_t* node)
 	free(node->unvisited);
 	free(node);
 }
+
+message_t* tsp_search_node_encode(tsp_t* problem, tsp_search_node_t* node)
+{
+	const int N = problem->n;
+
+	// 1 int for node->depth
+	// N ints for node->visited + node->unvisited sets
+	int count = 1 + N;
+	int* buffer = (int*) malloc(count * sizeof(int));
+
+	buffer[0] = node->depth;
+
+	int offset = 1;
+	int visited_count = node->depth + 1;
+	for (int i = 0; i < visited_count; i++)
+		buffer[offset + i] = node->visited[i];
+
+	offset = 1 + visited_count;
+	int unvisited_count = N - visited_count;
+	for (int i = 0; i < unvisited_count; i++)
+		buffer[offset + i] = node->unvisited[i];
+
+	message_t* msg = (message_t*) malloc(sizeof(message_t));
+	msg->buffer = (void*) buffer;
+	msg->count = count;
+	msg->type = MPI_INT;
+	return msg;
+}
+
+tsp_search_node_t* tsp_search_node_decode(message_t* message)
+{}

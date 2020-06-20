@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include <mpi.h>
 #include "tsp.h"
 #include "message.h"
@@ -6,7 +7,8 @@
 #include "debug.h"
 
 tsp_t* input(int argc, char** argv);
-message_t* encode_all_lists_recvcounts(tsp_t* problem, int nproc, list_t** all_lists);
+messages_t* encode_all_lists_recvcounts(tsp_t* problem, int nproc, list_t** all_lists);
+messagesv_t* encode_all_lists(tsp_t* problem, int nproc, list_t** all_lists);
 
 void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 {
@@ -29,6 +31,7 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	MPI_Bcast(
 		sendmsg->buffer, sendmsg->count, sendmsg->type,
 		my_rank, MPI_COMM_WORLD);
+
 	char strbuf[MESSAGE_BUFFER_STRING_MAX];
 	message_buffer_to_string(sendmsg, strbuf);
 	debug("master::bcast", "sendmsg->buffer = %s", strbuf);
@@ -56,7 +59,7 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	for (int i = 0; i < niterations; i++)
 	{
 		tsp_search_iterate(search, TSP_SEARCH_BREADTH_FIRST);
-		/* VERBOSE: / debug("master::pre_compute", "search->list->length = %d", search->list->length); /**/
+		// VERBOSE: debug("master::pre_compute", "search->list->length = %d", search->list->length);
 	}
 
 	/** Round-robin the search nodes to the each process. */
@@ -67,7 +70,7 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	while (search->list->length)
 	{
 		list_enqueue(all_lists[rank], list_dequeue(search->list));
-		/* VERBOSE: / debug("master::round_robin", "all_lists[rank = %d]->length = %d", rank, all_lists[rank]->length); /**/
+		// VERBOSE: debug("master::round_robin", "all_lists[rank = %d]->length = %d", rank, all_lists[rank]->length);
 		if (--rank == -1)
 			rank = nproc - 1;
 	}
@@ -79,22 +82,38 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	 * will be used by each process in an MPI_Scatterv to receive its
 	 * individual list from the master.
 	 */
-	sendmsg = encode_all_lists_recvcounts(problem, nproc, all_lists);
-	int my_list_recvcount, recvcount = 1; MPI_Datatype recvtype = MPI_INT;
+	messages_t* sendmsgs = encode_all_lists_recvcounts(problem, nproc, all_lists);
+	message_t* recvmsg = message_new(MPI_INT);
+	int recvcount = 1; MPI_Datatype recvtype = MPI_INT;
 	MPI_Scatter(
-		sendmsg->buffer, sendmsg->count, sendmsg->type,
-		&my_list_recvcount, recvcount, recvtype,
+		sendmsgs->buffer, sendmsgs->scatter_count, sendmsgs->type,
+		&recvmsg->count, recvcount, recvtype,
 		my_rank, MPI_COMM_WORLD);
-	message_del(sendmsg), sendmsg = NULL;
-	debug("master::scatter", "my_list_recvcount = %d", my_list_recvcount);
+
+	message_buffer_to_string((message_t*) sendmsgs, strbuf);
+	debug("master::scatter::send", "sendmsgs->buffer = %s", strbuf);
+	messages_del(sendmsgs), sendmsgs = NULL;
+	debug("master::scatter::recv", "recvmsg->count = %d", recvmsg->count);
 
 	/** Scatterv each process' list to each process. */
-	// messagesv_t* sendsv = tsp_encode_all_lists(all_lists);
-	// tsp_search_node_t* my_encoded_list; recvcount = my_list_recvcount;
-	// MPI_Scatterv(
-	// 	sendsv->buffer, sendsv->counts, sendsv->offsets, sendsv->type,
-	// 	(void*) my_list, recvcount, MPI_INT, my_rank,
-	// 	MPI_COMM_WORLD);
+	messagesv_t* sendmsgsv = encode_all_lists(problem, nproc, all_lists);
+	for (int rank = 0; rank < nproc; rank++)
+		list_del(all_lists[rank]);
+	free(all_lists), all_lists = NULL;
+	recvmsg->buffer = malloc(recvmsg->count * sizeof(int));
+	MPI_Scatterv(
+		sendmsgsv->buffer, sendmsgsv->counts, sendmsgsv->offsets, sendmsgsv->type,
+		recvmsg->buffer, recvmsg->count, recvmsg->type,
+		my_rank, MPI_COMM_WORLD);
+
+	message_buffer_to_string((message_t*) sendmsgsv, strbuf);
+	debug("master::scatterv::send", "sendmsgsv->buffer = %s", strbuf);
+	messagesv_del(sendmsgsv), sendmsgsv = NULL;
+	message_buffer_to_string(recvmsg, strbuf);
+	debug("master::scatterv::recv", "recvmsg->buffer = %s", strbuf);
+	message_del(recvmsg), recvmsg = NULL;
+
+	// ---
 
 	// int size_of_encoded_tsp_search_node = ?;
 	// int size = size_of_encoded_tsp_search_state;
@@ -139,22 +158,74 @@ tsp_t* input(int argc, char** argv)
 	return problem;
 }
 
-message_t* encode_all_lists_recvcounts(tsp_t* problem, int nproc, list_t** all_lists)
+messages_t* encode_all_lists_recvcounts(tsp_t* problem, int nproc, list_t** all_lists)
 {
-	message_t* message = (message_t*) malloc(sizeof(message_t));
+	messages_t* messages = (messages_t*) malloc(sizeof(messages_t));
 
 	// 1 tsp_search_node_t encoded as int* is:
 	// 1 int for depth + N ints for visited + unvisited sets.
-	int sizeof_encoded_tsp_search_node = (1 + problem->n);
+	int encoded_tsp_search_node_count = (1 + problem->n);
 	int* buffer = (int*) malloc(nproc * sizeof(int));
 	for (int rank = 0; rank < nproc; rank++)
-		buffer[rank] = all_lists[rank]->length * sizeof_encoded_tsp_search_node;
-	message->buffer = (void*) buffer;
+		buffer[rank] = all_lists[rank]->length * encoded_tsp_search_node_count;
+	messages->buffer = (void*) buffer;
+
+	messages->count = nproc;
+
+	messages->type = MPI_INT;
 
 	// Send only 1 int to each process.
-	message->count = 1;
+	messages->scatter_count = 1;
 
-	message->type = MPI_INT;
+	return messages;
+}
 
-	return message;
+messagesv_t* encode_all_lists(tsp_t* problem, int nproc, list_t** all_lists)
+{
+	int encoded_tsp_search_node_count = (1 + problem->n);
+	const int NODE_COUNT = encoded_tsp_search_node_count;
+
+	int total_count = 0;
+	int* counts = (int*) malloc(nproc * sizeof(int));
+	int* offsets = (int*) malloc(nproc * sizeof(int));
+	for (int rank = 0; rank < nproc; rank++)
+	{
+		list_t* my_list = all_lists[rank];
+
+		counts[rank] = my_list->length * NODE_COUNT;
+		total_count += counts[rank];
+
+		if (rank == 0)
+			offsets[rank] = 0;
+		else
+			offsets[rank] = offsets[rank - 1] + counts[rank - 1];
+	}
+
+	int* buffer = (int*) malloc(total_count * sizeof(int));
+
+	for (int rank = 0; rank < nproc; rank++)
+	{
+		int index = 0;
+		list_t* my_list = all_lists[rank];
+		while (my_list->length)
+		{
+			tsp_search_node_t* search_node = list_dequeue(my_list);
+			message_t* msg = tsp_search_node_encode(problem, search_node);
+			memcpy(
+				buffer + offsets[rank] + index*NODE_COUNT,
+				msg->buffer,
+				msg->count * sizeof(int));
+			message_del(msg);
+			tsp_search_node_del(search_node);
+			index++;
+		}
+	}
+
+	messagesv_t* msgv = (messagesv_t*) malloc(sizeof(messagesv_t));
+	msgv->buffer = (void*) buffer;
+	msgv->count = total_count;
+	msgv->type = MPI_INT;
+	msgv->counts = counts;
+	msgv->offsets = offsets;
+	return msgv;
 }

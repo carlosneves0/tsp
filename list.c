@@ -29,11 +29,8 @@ void list_del(list_t* list)
 	{
 		list_node_t* del = x;
 		x = x->next;
-		// Whose responsibility is it to clean up this data?
-		// In the C vibe I feel it's the user's responsibility.
-		// Like, "don't assume I'll do anything for you".
-		// if (del->data)
-		// 	free(del->data);
+		if (del->data)
+			free(del->data);
 		free(del);
 	}
 	free(list);

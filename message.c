@@ -3,11 +3,11 @@
 #include <string.h>
 #include "message.h"
 
-message_t* message_new(void* buffer, int count, MPI_Datatype type)
+message_t* message_new(MPI_Datatype type)
 {
 	message_t* message = (message_t*) malloc(sizeof(message_t));
-	message->buffer = buffer;
-	message->count = count;
+	message->buffer = NULL;
+	message->count = 0;
 	message->type = type;
 	return message;
 }
@@ -20,7 +20,7 @@ void message_del(message_t* message)
 }
 
 /** Good size for a full-width terminal. */
-const int MESSAGE_BUFFER_STRING_MAX = 96;
+const int MESSAGE_BUFFER_STRING_MAX = 86;
 
 void message_buffer_to_string(message_t* message, char* string)
 {
@@ -61,4 +61,20 @@ void message_buffer_to_string(message_t* message, char* string)
 		string[MESSAGE_BUFFER_STRING_MAX - 2] = ']';
 		string[MESSAGE_BUFFER_STRING_MAX - 1] = '\0';
 	}
+}
+
+void messages_del(messages_t* messages)
+{
+	if (messages->buffer)
+		free(messages->buffer);
+	free(messages);
+}
+
+void messagesv_del(messagesv_t* messagesv)
+{
+	if (messagesv->counts)
+		free(messagesv->counts);
+	if (messagesv->offsets)
+		free(messagesv->offsets);
+	free(messagesv);
 }

@@ -43,8 +43,8 @@ struct tsp_search_node
 typedef struct tsp_search_node tsp_search_node_t;
 tsp_search_node_t* tsp_search_node_new(tsp_search_node_t* parent, int new_visited_node, const int N);
 void tsp_search_node_del(tsp_search_node_t* node);
-message_t* tsp_search_node_encode(tsp_search_node_t* node);
-tsp_search_node_t* tsp_search_node_decode(message_t*);
+message_t* tsp_search_node_encode(tsp_t* problem, tsp_search_node_t* node);
+tsp_search_node_t* tsp_search_node_decode(message_t* message);
 
 /**
  * tsp_search_t
