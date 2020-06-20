@@ -2,6 +2,7 @@
 set -euo pipefail
 
 N=${1:-4}
+printf '%d\n' "$N"
 for i in $(seq 1 "$N"); do
   for j in $(seq 1 "$N"); do
     if test "$i" == "$j"; then
