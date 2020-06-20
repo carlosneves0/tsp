@@ -192,9 +192,11 @@ tsp_solution_t* tsp_solution_new(tsp_t* problem, tsp_search_node_t* search_node)
 	int cost = 0;
 	int** c = problem->cost;
 	for (int i = 1; i < N; i++)
-		cost += c[i-1][i];
-	int initial_node = search_node->visited[0];
-	cost += c[N-1][initial_node];
+	{
+		int u = circuit[i-1], v = circuit[i];
+		cost += c[u][v];
+	}
+	cost += c[circuit[N-1]][circuit[0]];
 
 	tsp_solution_t* solution = (tsp_solution_t*) malloc(sizeof(tsp_solution_t));
 	solution->problem = problem;
