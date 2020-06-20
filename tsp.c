@@ -119,9 +119,9 @@ void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy)
 
 	tsp_search_node_t* x;
 	if (strategy == TSP_SEARCH_DEPTH_FIRST)
-		x = (tsp_search_node_t*) stack_pop(search->list);
+		x = (tsp_search_node_t*) list_unstack(search->list);
 	else
-		x = (tsp_search_node_t*) queue_pop(search->list);
+		x = (tsp_search_node_t*) list_dequeue(search->list);
 
 	// TODO: Check if x is a search tree leaf, i.e. a solution.
 	// "search->optimum = x";
@@ -168,9 +168,9 @@ void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy)
 		// %DEBUG%
 
 		if (strategy == TSP_SEARCH_DEPTH_FIRST)
-			stack_push(search->list, (void*) y);
+			list_stack(search->list, (void*) y);
 		else
-			queue_push(search->list, (void*) y);
+			list_enqueue(search->list, (void*) y);
 	}
 
 	tsp_search_node_del(x);

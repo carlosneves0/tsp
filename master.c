@@ -66,7 +66,7 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	int rank = nproc - 1;
 	while (search->list->length)
 	{
-		queue_push(all_lists[rank], queue_pop(search->list));
+		list_enqueue(all_lists[rank], list_dequeue(search->list));
 		/* VERBOSE: / debug("master::round_robin", "all_lists[rank = %d]->length = %d", rank, all_lists[rank]->length); /**/
 		if (--rank == -1)
 			rank = nproc - 1;

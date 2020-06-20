@@ -39,7 +39,27 @@ void list_del(list_t* list)
 	free(list);
 }
 
-void* queue_pop(list_t* list)
+void list_enqueue(list_t* list, void* data)
+{
+	list_node_t* new_node = (list_node_t*) malloc(sizeof(list_node_t));
+	new_node->data = data;
+	new_node->next = NULL;
+
+	if (list->length == 0)
+	{
+		list->head = new_node;
+		list->tail = new_node;
+		list->length = 1;
+	}
+	else
+	{
+		list->tail->next = new_node;
+		list->tail = new_node;
+		list->length++;
+	}
+}
+
+void* list_dequeue(list_t* list)
 {
 	if (list->length == 0)
 		return NULL;
@@ -63,30 +83,10 @@ void* queue_pop(list_t* list)
 	return data;
 }
 
-void queue_push(list_t* list, void* data)
-{
-	list_node_t* new_node = (list_node_t*) malloc(sizeof(list_node_t));
-	new_node->data = data;
-	new_node->next = NULL;
+void list_stack(list_t* list, void* data)
+{}
 
-	if (list->length == 0)
-	{
-		list->head = new_node;
-		list->tail = new_node;
-		list->length = 1;
-	}
-	else
-	{
-		list->tail->next = new_node;
-		list->tail = new_node;
-		list->length++;
-	}
-}
-
-void* stack_pop(list_t* list)
+void* list_unstack(list_t* list)
 {
 	return NULL;
 }
-
-void stack_push(list_t* list, void* data)
-{}
