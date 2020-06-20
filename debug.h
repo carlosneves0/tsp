@@ -5,7 +5,11 @@
 /**
  * Turn debug output on or off.
  */
+#ifdef DEBUG
 #define __DEBUG__ 1
+#else
+#define __DEBUG__ 0
+#endif
 
 /** Both declared and initialized in main.c. */
 extern int my_rank;
