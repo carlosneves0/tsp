@@ -6,17 +6,26 @@ build: pcv arquivo-entrada.txt
 pcv: .bin/tsp
 	ln -sf ./.bin/tsp pcv
 
-.bin/tsp: .bin/list.o .bin/tsp.o .bin/main.o | .bin
-	mpicc .bin/list.o .bin/tsp.o .bin/main.o -o .bin/tsp -fopenmp
+.bin/tsp: .bin/list.o .bin/main.o .bin/master.o .bin/message.o .bin/slave.o .bin/tsp.o | .bin
+	mpicc .bin/list.o .bin/main.o .bin/master.o .bin/message.o .bin/slave.o .bin/tsp.o -o .bin/tsp -fopenmp
 
 .bin/list.o: list.h list.c | .bin
 	mpicc -c list.c -o .bin/list.o -Wall
 
-.bin/tsp.o: tsp.h tsp.c | .bin
-	mpicc -c tsp.c -o .bin/tsp.o -Wall
-
-.bin/main.o: debug.h main.c | .bin
+.bin/main.o: debug.h master.h slave.h main.c | .bin
 	mpicc -c main.c -o .bin/main.o -Wall
+
+.bin/master.o: debug.h list.h message.h tsp.h master.c | .bin
+	mpicc -c master.c -o .bin/master.o -Wall
+
+.bin/message.o: message.h message.c | .bin
+	mpicc -c message.c -o .bin/message.o -Wall
+
+.bin/slave.o: debug.h message.h slave.h tsp.h slave.c | .bin
+	mpicc -c slave.c -o .bin/slave.o -Wall
+
+.bin/tsp.o: list.h tsp.h tsp.c | .bin
+	mpicc -c tsp.c -o .bin/tsp.o -Wall
 
 .bin:
 	mkdir -p .bin

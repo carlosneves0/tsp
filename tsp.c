@@ -1,9 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
+#include <mpi.h>
 #include "tsp.h"
-
-const int TSP_SEARCH_MAX_DEPTH = -1;
-const int TSP_MAX_STRING_LENGTH = 96;
 
 /*******************************************************************************
  * tsp_t
@@ -35,34 +33,35 @@ void tsp_del(tsp_t* problem)
 	free(problem);
 }
 
-tsp_message_t* tsp_encode(tsp_t* problem)
+message_t* tsp_encode(tsp_t* problem)
 {
 	// 1 int for n
 	// n*n int's for cost
-	tsp_message_t* message = (tsp_message_t*) malloc(sizeof(tsp_message_t));
+	message_t* message = (message_t*) malloc(sizeof(message_t));
 
 	const int N = problem->n;
 
 	message->count = 1 + N*N;
 
-	message->buffer = (int*) malloc(message->count * sizeof(int));
-
-	message->buffer[0] = N;
-
+	int* buffer = (int*) malloc(message->count * sizeof(int));
+	buffer[0] = N;
 	int offset = 1;
 	for (int i = 0; i < N; i++)
 		for (int j = 0; j < N; j++)
-			message->buffer[offset + (i*N + j)] = problem->cost[i][j];
+			buffer[offset + (i*N + j)] = problem->cost[i][j];
+	message->buffer = (void*) buffer;
+
+	message->type = MPI_INT;
 
 	return message;
 }
 
-tsp_t* tsp_decode(tsp_message_t* message)
+tsp_t* tsp_decode(message_t* message)
 {
 	tsp_t* problem = (tsp_t*) malloc(sizeof(tsp_t));
 
-	problem->n = message->buffer[0];
-	const int N = problem->n;
+	int* buffer = (int*) message->buffer;
+	const int N = problem->n = buffer[0];
 
 	int offset = 1;
 	problem->cost = (int**) malloc(N * sizeof(int*));
@@ -70,7 +69,7 @@ tsp_t* tsp_decode(tsp_message_t* message)
 	{
 		problem->cost[i] = (int*) malloc(N * sizeof(int));
 		for (int j = 0; j < N; j++)
-			problem->cost[i][j] = message->buffer[offset + (i*N + j)];
+			problem->cost[i][j] = buffer[offset + (i*N + j)];
 	}
 
 	return problem;
@@ -221,52 +220,4 @@ void tsp_search_node_del(tsp_search_node_t* node)
 	free(node->visited);
 	free(node->unvisited);
 	free(node);
-}
-
-/*******************************************************************************
- * tsp_message_t
- * A generic data type that describes a message as a sequential block of int's.
- ******************************************************************************/
-tsp_message_t* tsp_message_new(void)
-{
-	return (tsp_message_t*) malloc(sizeof(tsp_message_t));
-}
-
-void tsp_message_del(tsp_message_t* message)
-{
-	free(message->buffer);
-	free(message);
-}
-
-void tsp_message_buffer_to_string(char* string, tsp_message_t* message)
-{
-	const int count = message->count;
-	const int* buffer = message->buffer;
-
-	char tmpbuf[TSP_MAX_STRING_LENGTH];
-	int index = 0;
-	index += sprintf(string, "[");
-	for (int i = 0; i < count; i++)
-	{
-		int length = sprintf(tmpbuf, "%d%s", buffer[i], (i < count-1 ? "," : ""));
-		if (index + length < TSP_MAX_STRING_LENGTH)
-		{
-			memcpy(string + index, tmpbuf, length);
-			index += length;
-		}
-	}
-	if (index < TSP_MAX_STRING_LENGTH - 1)
-	{
-		index += sprintf(string + index, "]");
-		string[index] = '\0';
-	}
-	else
-	{
-		// Content overflowed 127 chars limitation.
-		string[TSP_MAX_STRING_LENGTH - 5] = '.';
-		string[TSP_MAX_STRING_LENGTH - 4] = '.';
-		string[TSP_MAX_STRING_LENGTH - 3] = '.';
-		string[TSP_MAX_STRING_LENGTH - 2] = ']';
-		string[TSP_MAX_STRING_LENGTH - 1] = '\0';
-	}
 }

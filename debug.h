@@ -7,6 +7,7 @@
  */
 #define __DEBUG__ 1
 
+/** Both declared and initialized in main.c. */
 extern int my_rank;
 extern char my_node[MPI_MAX_PROCESSOR_NAME];
 
