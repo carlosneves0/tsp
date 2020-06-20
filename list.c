@@ -3,13 +3,22 @@
 
 list_t* list_new(void* data)
 {
-	list_t* list = malloc(sizeof(list_t));
-	list_node_t* initial_node = malloc(sizeof(list_node_t));
-	initial_node->data = data;
-	initial_node->next = NULL;
-	list->head = initial_node;
-	list->tail = initial_node;
-	list->length = 1;
+	list_t* list = (list_t*) malloc(sizeof(list_t));
+	if (data)
+	{
+		list_node_t* initial_node = (list_node_t*) malloc(sizeof(list_node_t));
+		initial_node->data = data;
+		initial_node->next = NULL;
+		list->head = initial_node;
+		list->tail = initial_node;
+		list->length = 1;
+	}
+	else
+	{
+		list->head = NULL;
+		list->tail = NULL;
+		list->length = 0;
+	}
 	return list;
 }
 
@@ -20,8 +29,11 @@ void list_del(list_t* list)
 	{
 		list_node_t* del = x;
 		x = x->next;
-		if (del->data)
-			free(del->data);
+		// Whose responsibility is it to clean up this data?
+		// In the C vibe I feel it's the user's responsibility.
+		// Like, "don't assume I'll do anything for you".
+		// if (del->data)
+		// 	free(del->data);
 		free(del);
 	}
 	free(list);
@@ -53,7 +65,7 @@ void* queue_pop(list_t* list)
 
 void queue_push(list_t* list, void* data)
 {
-	list_node_t* new_node = malloc(sizeof(list_node_t));
+	list_node_t* new_node = (list_node_t*) malloc(sizeof(list_node_t));
 	new_node->data = data;
 	new_node->next = NULL;
 

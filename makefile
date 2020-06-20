@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := build
-.PHONY: build clean exec _exec cluster-topology
+.PHONY: build clean exec _exec cluster-topology genprobl
 
 build: pcv arquivo-entrada.txt
 
@@ -21,8 +21,8 @@ pcv: .bin/tsp
 .bin:
 	mkdir -p .bin
 
-arquivo-entrada.txt: __problems__/0/input
-	ln -sf ./__problems__/0/input arquivo-entrada.txt
+arquivo-entrada.txt: __problems__/1/input
+	ln -sf ./__problems__/1/input arquivo-entrada.txt
 
 clean:
 	rm -rf .bin
@@ -32,6 +32,11 @@ exec: nodes.txt .bin/tsp arquivo-entrada.txt
 
 _exec: .bin/tsp arquivo-entrada.txt
 	mpiexec --np 3 --oversubscribe .bin/tsp arquivo-entrada.txt
+	@rm arquivo-entrada.txt
 
 cluster-topology:
 	bash __scripts__/cluster-topology.bash
+
+n := $(n)
+genprobl:
+	@exec bash __scripts__/genprobl.bash $(n)

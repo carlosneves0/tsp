@@ -1,11 +1,14 @@
 #include <stdlib.h>
+#include <string.h>
 #include "tsp.h"
+
+const int TSP_SEARCH_MAX_DEPTH = -1;
+const int TSP_MAX_STRING_LENGTH = 96;
 
 /*******************************************************************************
  * tsp_t
  * The data that describe an instance of the TSP.
  ******************************************************************************/
-
 tsp_t* tsp_new(FILE* stream)
 {
 	tsp_t* problem = (tsp_t*) malloc(sizeof(tsp_t));
@@ -77,7 +80,6 @@ tsp_t* tsp_decode(tsp_message_t* message)
  * tsp_search_t
  * This struct describes the state a
  ******************************************************************************/
-
 tsp_search_t* tsp_search_new(tsp_t* problem, int initial_node)
 {
 	tsp_search_t* search = (tsp_search_t*) malloc(sizeof(tsp_search_t));
@@ -106,33 +108,129 @@ void tsp_search_del(tsp_search_t* search)
 	free(search);
 }
 
-char* tsp_search_to_string(tsp_search_t* search)
+void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy)
 {
-	// TODO: max_string_length = 128 characters
-	// TODO: sprintf(string, "{optimum = %s,", (search->optimum ? tsp_solution_to_string(search->optimum) : "NULL"));
-	// TODO: sprintf(string, "list = %s}", list_to_string(search->list));
-	// return string;
-	static const int STRING_MAX_LENGTH = 128;
-	char* string = (char*) malloc(STRING_MAX_LENGTH + 1);
-	
-	return NULL;
+	// %DEBUG%
+	// printf("strategy = %d\n", strategy);
+	// printf("TSP_SEARCH_DEPTH_FIRST = %d\n", TSP_SEARCH_DEPTH_FIRST);
+	// printf("TSP_SEARCH_BREADTH_FIRST = %d\n", TSP_SEARCH_BREADTH_FIRST);
+	// %DEBUG%
+
+	const int N = search->problem->n;
+
+	tsp_search_node_t* x;
+	if (strategy == TSP_SEARCH_DEPTH_FIRST)
+		x = (tsp_search_node_t*) stack_pop(search->list);
+	else
+		x = (tsp_search_node_t*) queue_pop(search->list);
+
+	// TODO: Check if x is a search tree leaf, i.e. a solution.
+	// "search->optimum = x";
+
+	// %DEBUG%
+	// int x_visited_count = x->depth + 1;
+	// printf("x->visited = ");
+	// for (int j = 0; j < x_visited_count; j++)
+	// 	printf("%d ", x->visited[j]);
+	// printf("\n"); fflush(stdout);
+	// int x_unvisited_count = N - x_visited_count;
+	// printf("x->unvisited = ");
+	// for (int j = 0; j < x_unvisited_count; j++)
+	// 	printf("%d ", x->unvisited[j]);
+	// printf("\n"); fflush(stdout);
+	// %DEBUG%
+
+	// Expand x's children and add them to the search list.
+	int x_unvisited_count = N - (x->depth + 1);
+	// %DEBUG%
+	// printf("x_unvisited_count = %d\n", x_unvisited_count);
+	// %DEBUG%
+	for (int i = 0; i < x_unvisited_count; i++)
+	{
+		// %DEBUG%
+		// printf("\ni = %d\tx->unvisited[%d] = %d\tN = %d\n", i, i, x->unvisited[i], N);
+		// %DEBUG%
+
+		tsp_search_node_t* y = tsp_search_node_new(x, x->unvisited[i], N);
+
+		// %DEBUG%
+		// int y_visited_count = y->depth + 1;
+		// printf("y_visited_count = %d\n", y_visited_count);
+		// printf("y->visited = "); fflush(stdout);
+		// for (int j = 0; j < y_visited_count; j++)
+		// 	printf("%d ", y->visited[j]); fflush(stdout);
+		// printf("\n"); fflush(stdout);
+		// int y_unvisited_count = N - y_visited_count;
+		// printf("y_unvisited_count = %d\n", y_unvisited_count);
+		// printf("y->unvisited = "); fflush(stdout);
+		// for (int j = 0; j < y_unvisited_count; j++)
+		// 	printf("%d ", y->unvisited[j]); fflush(stdout);
+		// printf("\n"); fflush(stdout);
+		// %DEBUG%
+
+		if (strategy == TSP_SEARCH_DEPTH_FIRST)
+			stack_push(search->list, (void*) y);
+		else
+			queue_push(search->list, (void*) y);
+	}
+
+	tsp_search_node_del(x);
 }
 
-void tsp_search_expand(tsp_search_t* search, tsp_search_strategy_t strategy, int depth)
+/*******************************************************************************
+ * tsp_search_node_t
+ * The data that describe a node in the TSP's search tree.
+ ******************************************************************************/
+tsp_search_node_t* tsp_search_node_new(tsp_search_node_t* parent, int new_visited_node, const int N)
 {
-	if depth == -1
-		while (!list.empty())
+	tsp_search_node_t* search_node = (tsp_search_node_t*) malloc(sizeof(tsp_search_node_t));
 
-	while (depth--)
-	{
-		x = list
-	}
+	search_node->depth = parent->depth + 1;
+
+	int parent_visited_count = parent->depth + 1;
+	search_node->visited = (int*) malloc((parent_visited_count + 1) * sizeof(int));
+	memcpy(search_node->visited, parent->visited, parent_visited_count * sizeof(int));
+	search_node->visited[parent_visited_count] = new_visited_node;
+
+	int parent_unvisited_count = N - (parent->depth + 1);
+	search_node->unvisited = (int*) malloc((parent_unvisited_count - 1) * sizeof(int));
+	for (int j = 0, k = 0; j < parent_unvisited_count; j++)
+		if (parent->unvisited[j] != new_visited_node)
+			search_node->unvisited[k++] = parent->unvisited[j];
+
+	// %DEBUG%
+	// int search_node_visited_count = search_node->depth + 1, search_node_unvisited_count = N - search_node_visited_count;
+	// printf("search_node->depth = %d\n", search_node->depth);
+	// printf("parent_visited_count = %d\n", parent_visited_count);
+	// printf("search_node->visited = ");
+	// for (int j = 0; j < search_node_visited_count; j++)
+	// 	printf("%d ", search_node->visited[j]);
+	// printf("\n"); fflush(stdout);
+	// printf("parent_unvisited_count = %d\n", parent_unvisited_count);
+	// printf("search_node->unvisited = ");
+	// for (int j = 0; j < search_node_unvisited_count; j++)
+	// 	printf("%d ", search_node->unvisited[j]);
+	// printf("\n"); fflush(stdout);
+	// %DEBUG%
+
+	return search_node;
+}
+
+void tsp_search_node_del(tsp_search_node_t* node)
+{
+	free(node->visited);
+	free(node->unvisited);
+	free(node);
 }
 
 /*******************************************************************************
  * tsp_message_t
  * A generic data type that describes a message as a sequential block of int's.
  ******************************************************************************/
+tsp_message_t* tsp_message_new(void)
+{
+	return (tsp_message_t*) malloc(sizeof(tsp_message_t));
+}
 
 void tsp_message_del(tsp_message_t* message)
 {
@@ -140,23 +238,35 @@ void tsp_message_del(tsp_message_t* message)
 	free(message);
 }
 
-char* tsp_message_buffer_to_string(tsp_message_t* message)
+void tsp_message_buffer_to_string(char* string, tsp_message_t* message)
 {
 	const int count = message->count;
 	const int* buffer = message->buffer;
-	static const int MAX_INT_LENGTH = 8;
-	char* string = malloc(2 + count*MAX_INT_LENGTH + 1); // "[1,2,3,4]\0"
 
-	char* s = string;
-	s += sprintf(s, "[");
+	char tmpbuf[TSP_MAX_STRING_LENGTH];
+	int index = 0;
+	index += sprintf(string, "[");
 	for (int i = 0; i < count; i++)
-		s += sprintf(s, "%d%s", buffer[i], (i < count-1 ? "," : ""));
-	s += sprintf(s, "]");
-	s[0] = '\0';
-
-	// Try to free(string)...
-	// I know there will be memory leaks... but I just wanna be able to do:
-	// printf("foo %s bar", to_string(message));
-	// Is there a way to do this without memory leaks?
-	return string;
+	{
+		int length = sprintf(tmpbuf, "%d%s", buffer[i], (i < count-1 ? "," : ""));
+		if (index + length < TSP_MAX_STRING_LENGTH)
+		{
+			memcpy(string + index, tmpbuf, length);
+			index += length;
+		}
+	}
+	if (index < TSP_MAX_STRING_LENGTH - 1)
+	{
+		index += sprintf(string + index, "]");
+		string[index] = '\0';
+	}
+	else
+	{
+		// Content overflowed 127 chars limitation.
+		string[TSP_MAX_STRING_LENGTH - 5] = '.';
+		string[TSP_MAX_STRING_LENGTH - 4] = '.';
+		string[TSP_MAX_STRING_LENGTH - 3] = '.';
+		string[TSP_MAX_STRING_LENGTH - 2] = ']';
+		string[TSP_MAX_STRING_LENGTH - 1] = '\0';
+	}
 }
