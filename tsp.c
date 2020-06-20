@@ -76,6 +76,199 @@ tsp_t* tsp_decode(message_t* message)
 }
 
 /*******************************************************************************
+ * tsp_search_node_t
+ * The data that describe a node in the TSP's search tree.
+ ******************************************************************************/
+tsp_search_node_t* tsp_search_node_new(tsp_search_node_t* parent, int new_visited_node, const int N)
+{
+	tsp_search_node_t* search_node = (tsp_search_node_t*) malloc(sizeof(tsp_search_node_t));
+
+	search_node->depth = parent->depth + 1;
+
+	int parent_visited_count = parent->depth + 1;
+	search_node->visited = (int*) malloc((parent_visited_count + 1) * sizeof(int));
+	memcpy(search_node->visited, parent->visited, parent_visited_count * sizeof(int));
+	search_node->visited[parent_visited_count] = new_visited_node;
+
+	// if parent_notvisited_count == 0, we're still good, we can malloc(0).
+	// https://stackoverflow.com/questions/2022335/whats-the-point-of-malloc0
+	int parent_notvisited_count = N - (parent->depth + 1);
+	search_node->notvisited = (int*) malloc((parent_notvisited_count - 1) * sizeof(int));
+	for (int j = 0, k = 0; j < parent_notvisited_count; j++)
+		if (parent->notvisited[j] != new_visited_node)
+			search_node->notvisited[k++] = parent->notvisited[j];
+
+	// %DEBUG%
+	// int search_node_visited_count = search_node->depth + 1, search_node_notvisited_count = N - search_node_visited_count;
+	// printf("search_node->depth = %d\n", search_node->depth);
+	// printf("parent_visited_count = %d\n", parent_visited_count);
+	// printf("search_node->visited = ");
+	// for (int j = 0; j < search_node_visited_count; j++)
+	// 	printf("%d ", search_node->visited[j]);
+	// printf("\n"); fflush(stdout);
+	// printf("parent_notvisited_count = %d\n", parent_notvisited_count);
+	// printf("search_node->notvisited = ");
+	// for (int j = 0; j < search_node_notvisited_count; j++)
+	// 	printf("%d ", search_node->notvisited[j]);
+	// printf("\n"); fflush(stdout);
+	// %DEBUG%
+
+	return search_node;
+}
+
+void tsp_search_node_del(tsp_search_node_t* node)
+{
+	free(node->visited);
+	free(node->notvisited);
+	free(node);
+}
+
+message_t* tsp_search_node_encode(tsp_t* problem, tsp_search_node_t* node)
+{
+	const int N = problem->n;
+
+	// 1 int for node->depth
+	// N ints for node->visited + node->notvisited sets
+	int count = 1 + N;
+	int* buffer = (int*) malloc(count * sizeof(int));
+
+	buffer[0] = node->depth;
+
+	int offset = 1;
+	int visited_count = node->depth + 1;
+	for (int i = 0; i < visited_count; i++)
+		buffer[offset + i] = node->visited[i];
+
+	offset = 1 + visited_count;
+	int notvisited_count = N - visited_count;
+	for (int i = 0; i < notvisited_count; i++)
+		buffer[offset + i] = node->notvisited[i];
+
+	message_t* msg = (message_t*) malloc(sizeof(message_t));
+	msg->buffer = (void*) buffer;
+	msg->count = count;
+	msg->type = MPI_INT;
+	return msg;
+}
+
+tsp_search_node_t* tsp_search_node_decode(tsp_t* problem, message_t* msg)
+{
+	int* buffer = (int*) msg->buffer;
+
+	int depth = buffer[0];
+
+	int offset = 1;
+	int visited_count = depth + 1;
+	int* visited = (int*) malloc(visited_count * sizeof(int));
+	for (int i = 0; i < visited_count; i++)
+		visited[i] = buffer[offset + i];
+
+	// if notvisited_count == 0, we're still good, we can malloc(0).
+	// https://stackoverflow.com/questions/2022335/whats-the-point-of-malloc0
+	offset = 1 + visited_count;
+	int notvisited_count = problem->n - visited_count;
+	int* notvisited = (int*) malloc(notvisited_count * sizeof(int));
+	for (int i = 0; i < notvisited_count; i++)
+		notvisited[i] = buffer[offset + i];
+
+	tsp_search_node_t* search_node = (tsp_search_node_t*) malloc(sizeof(tsp_search_node_t));
+	search_node->depth = depth;
+	search_node->visited = visited;
+	search_node->notvisited = notvisited;
+	return search_node;
+}
+
+/*******************************************************************************
+ * tsp_solution_t
+ * A tsp_solution_t is a circuit in the TSP's graph.
+ ******************************************************************************/
+tsp_solution_t* tsp_solution_new(tsp_t* problem, tsp_search_node_t* search_node)
+{
+	const int N = search_node->depth + 1;
+
+	int* circuit = (int*) malloc(N * sizeof(int));
+	memcpy(circuit, search_node->visited, N * sizeof(int));
+
+	int cost = 0;
+	int** c = problem->cost;
+	for (int i = 1; i < N; i++)
+		cost += c[i-1][i];
+	int initial_node = search_node->visited[0];
+	cost += c[N-1][initial_node];
+
+	tsp_solution_t* solution = (tsp_solution_t*) malloc(sizeof(tsp_solution_t));
+	solution->problem = problem;
+	solution->cost = cost;
+	solution->circuit = circuit;
+	return solution;
+}
+
+void tsp_solution_del(tsp_solution_t* solution)
+{
+	free(solution->circuit);
+	free(solution);
+}
+
+const int TSP_SOLUTION_STRING_MAX = 128;
+
+void tsp_solution_to_string(tsp_solution_t* solution, char* string)
+{
+	const int TSP_SOLUTION_CIRCUIT_STRING_MAX = 53;
+	const int N = solution->problem->n;
+
+	char circuit[TSP_SOLUTION_CIRCUIT_STRING_MAX];
+	char tmpbuf[32];
+	int offset = 0, length;
+	offset += sprintf(circuit, "[");
+	for (int i = 0; i < N + 1; i++)
+	{
+		if (i < N)
+			length = sprintf(tmpbuf, "%d ", solution->circuit[i]);
+		else
+			length = sprintf(tmpbuf, "%d", solution->circuit[0]);
+
+		if (offset + length < TSP_SOLUTION_CIRCUIT_STRING_MAX)
+		{
+			memcpy(circuit + offset, tmpbuf, length);
+			offset += length;
+		}
+	}
+	if (offset < TSP_SOLUTION_CIRCUIT_STRING_MAX - 1)
+	{
+		offset += sprintf(circuit + offset, "]");
+		circuit[offset] = '\0';
+	}
+	else
+	{
+		// Content overflowed TSP_SOLUTION_CIRCUIT_STRING_MAX chars limitation.
+		circuit[TSP_SOLUTION_CIRCUIT_STRING_MAX - 5] = '.';
+		circuit[TSP_SOLUTION_CIRCUIT_STRING_MAX - 4] = '.';
+		circuit[TSP_SOLUTION_CIRCUIT_STRING_MAX - 3] = '.';
+		circuit[TSP_SOLUTION_CIRCUIT_STRING_MAX - 2] = ']';
+		circuit[TSP_SOLUTION_CIRCUIT_STRING_MAX - 1] = '\0';
+	}
+
+	// strlen("{ cost = %d, circuit = %s }") == 27
+	// 27 - strlen("%d%s") = 23
+	// strmaxlen(circuit) == 53
+	// 23 + 53 = 76
+	// 128 - 76 = 56, cost's %d has 56 chars; just to be extra safe.
+	offset = sprintf(string, "{ cost = %d, circuit = %s }", solution->cost, circuit);
+
+	// I just found out about snprintf ...
+	// TODO: rewrite the many `sprintf` to be `snprintf`.
+}
+
+void tsp_solution_print(tsp_solution_t* solution)
+{
+	printf("%d\n", solution->cost);
+	const int N = solution->problem->n;
+	for (int i = 0; i < N; i++)
+		printf("%d ", solution->circuit[i]);
+	printf("%d\n", solution->circuit[0]);
+}
+
+/*******************************************************************************
  * tsp_search_t
  * This struct describes the state a
  ******************************************************************************/
@@ -92,10 +285,10 @@ tsp_search_t* tsp_search_new(tsp_t* problem, int initial_node)
 	root->visited = (int*) malloc(sizeof(int));
 	root->visited[0] = initial_node;
 	const int N = problem->n;
-	root->unvisited = (int*) malloc((N-1) * sizeof(int));
+	root->notvisited = (int*) malloc((N-1) * sizeof(int));
 	for (int node = 0, index = 0; node < N; node++)
 		if (node != initial_node)
-			root->unvisited[index++] = node;
+			root->notvisited[index++] = node;
 	search->list = list_new((void*) root);
 
 	return search;
@@ -103,6 +296,8 @@ tsp_search_t* tsp_search_new(tsp_t* problem, int initial_node)
 
 void tsp_search_del(tsp_search_t* search)
 {
+	if (search->optimum)
+		tsp_solution_del(search->optimum);
 	list_del(search->list);
 	free(search);
 }
@@ -123,8 +318,24 @@ void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy)
 	else
 		x = (tsp_search_node_t*) list_dequeue(search->list);
 
-	// TODO: Check if x is a search tree leaf, i.e. a solution.
-	// "search->optimum = x";
+	// Check if x is a search tree leaf, i.e. a solution.
+	// And save x's solution if it's better than our current optimum.
+	if (x->depth == N - 1)
+	{
+		tsp_solution_t* s = tsp_solution_new(search->problem, x);
+		if (!search->optimum)
+			search->optimum = s;
+		else
+		{
+			if (s->cost < search->optimum->cost)
+			{
+				tsp_solution_del(search->optimum);
+				search->optimum = s;
+			}
+			else
+				tsp_solution_del(s);
+		}
+	}
 
 	// %DEBUG%
 	// int x_visited_count = x->depth + 1;
@@ -132,25 +343,25 @@ void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy)
 	// for (int j = 0; j < x_visited_count; j++)
 	// 	printf("%d ", x->visited[j]);
 	// printf("\n"); fflush(stdout);
-	// int x_unvisited_count = N - x_visited_count;
-	// printf("x->unvisited = ");
-	// for (int j = 0; j < x_unvisited_count; j++)
-	// 	printf("%d ", x->unvisited[j]);
+	// int x_notvisited_count = N - x_visited_count;
+	// printf("x->notvisited = ");
+	// for (int j = 0; j < x_notvisited_count; j++)
+	// 	printf("%d ", x->notvisited[j]);
 	// printf("\n"); fflush(stdout);
 	// %DEBUG%
 
 	// Expand x's children and add them to the search list.
-	int x_unvisited_count = N - (x->depth + 1);
+	int x_notvisited_count = N - (x->depth + 1);
 	// %DEBUG%
-	// printf("x_unvisited_count = %d\n", x_unvisited_count);
+	// printf("x_notvisited_count = %d\n", x_notvisited_count);
 	// %DEBUG%
-	for (int i = 0; i < x_unvisited_count; i++)
+	for (int i = 0; i < x_notvisited_count; i++)
 	{
 		// %DEBUG%
-		// printf("\ni = %d\tx->unvisited[%d] = %d\tN = %d\n", i, i, x->unvisited[i], N);
+		// printf("\ni = %d\tx->notvisited[%d] = %d\tN = %d\n", i, i, x->notvisited[i], N);
 		// %DEBUG%
 
-		tsp_search_node_t* y = tsp_search_node_new(x, x->unvisited[i], N);
+		tsp_search_node_t* y = tsp_search_node_new(x, x->notvisited[i], N);
 
 		// %DEBUG%
 		// int y_visited_count = y->depth + 1;
@@ -159,11 +370,11 @@ void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy)
 		// for (int j = 0; j < y_visited_count; j++)
 		// 	printf("%d ", y->visited[j]); fflush(stdout);
 		// printf("\n"); fflush(stdout);
-		// int y_unvisited_count = N - y_visited_count;
-		// printf("y_unvisited_count = %d\n", y_unvisited_count);
-		// printf("y->unvisited = "); fflush(stdout);
-		// for (int j = 0; j < y_unvisited_count; j++)
-		// 	printf("%d ", y->unvisited[j]); fflush(stdout);
+		// int y_notvisited_count = N - y_visited_count;
+		// printf("y_notvisited_count = %d\n", y_notvisited_count);
+		// printf("y->notvisited = "); fflush(stdout);
+		// for (int j = 0; j < y_notvisited_count; j++)
+		// 	printf("%d ", y->notvisited[j]); fflush(stdout);
 		// printf("\n"); fflush(stdout);
 		// %DEBUG%
 
@@ -176,79 +387,24 @@ void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy)
 	tsp_search_node_del(x);
 }
 
-/*******************************************************************************
- * tsp_search_node_t
- * The data that describe a node in the TSP's search tree.
- ******************************************************************************/
-tsp_search_node_t* tsp_search_node_new(tsp_search_node_t* parent, int new_visited_node, const int N)
+tsp_search_t* tsp_search_decode(tsp_t* problem, message_t* recvmsg)
 {
-	tsp_search_node_t* search_node = (tsp_search_node_t*) malloc(sizeof(tsp_search_node_t));
+	int encoded_tsp_search_node_count = (1 + problem->n);
+	const int NODE_COUNT = encoded_tsp_search_node_count;
 
-	search_node->depth = parent->depth + 1;
+	list_t* search_list = list_new(NULL);
+	message_t tmp;
+	for (int i = 0; i < recvmsg->count; i += NODE_COUNT)
+	{
+		tmp.buffer = (void*) (((int*) recvmsg->buffer) + i);
+		tmp.count = NODE_COUNT;
+		tsp_search_node_t* search_node = tsp_search_node_decode(problem, &tmp);
+		list_enqueue(search_list, (void*) search_node);
+	}
 
-	int parent_visited_count = parent->depth + 1;
-	search_node->visited = (int*) malloc((parent_visited_count + 1) * sizeof(int));
-	memcpy(search_node->visited, parent->visited, parent_visited_count * sizeof(int));
-	search_node->visited[parent_visited_count] = new_visited_node;
-
-	int parent_unvisited_count = N - (parent->depth + 1);
-	search_node->unvisited = (int*) malloc((parent_unvisited_count - 1) * sizeof(int));
-	for (int j = 0, k = 0; j < parent_unvisited_count; j++)
-		if (parent->unvisited[j] != new_visited_node)
-			search_node->unvisited[k++] = parent->unvisited[j];
-
-	// %DEBUG%
-	// int search_node_visited_count = search_node->depth + 1, search_node_unvisited_count = N - search_node_visited_count;
-	// printf("search_node->depth = %d\n", search_node->depth);
-	// printf("parent_visited_count = %d\n", parent_visited_count);
-	// printf("search_node->visited = ");
-	// for (int j = 0; j < search_node_visited_count; j++)
-	// 	printf("%d ", search_node->visited[j]);
-	// printf("\n"); fflush(stdout);
-	// printf("parent_unvisited_count = %d\n", parent_unvisited_count);
-	// printf("search_node->unvisited = ");
-	// for (int j = 0; j < search_node_unvisited_count; j++)
-	// 	printf("%d ", search_node->unvisited[j]);
-	// printf("\n"); fflush(stdout);
-	// %DEBUG%
-
-	return search_node;
+	tsp_search_t* search = (tsp_search_t*) malloc(sizeof(tsp_search_t));
+	search->problem = problem;
+	search->optimum = NULL;
+	search->list = search_list;
+	return search;
 }
-
-void tsp_search_node_del(tsp_search_node_t* node)
-{
-	free(node->visited);
-	free(node->unvisited);
-	free(node);
-}
-
-message_t* tsp_search_node_encode(tsp_t* problem, tsp_search_node_t* node)
-{
-	const int N = problem->n;
-
-	// 1 int for node->depth
-	// N ints for node->visited + node->unvisited sets
-	int count = 1 + N;
-	int* buffer = (int*) malloc(count * sizeof(int));
-
-	buffer[0] = node->depth;
-
-	int offset = 1;
-	int visited_count = node->depth + 1;
-	for (int i = 0; i < visited_count; i++)
-		buffer[offset + i] = node->visited[i];
-
-	offset = 1 + visited_count;
-	int unvisited_count = N - visited_count;
-	for (int i = 0; i < unvisited_count; i++)
-		buffer[offset + i] = node->unvisited[i];
-
-	message_t* msg = (message_t*) malloc(sizeof(message_t));
-	msg->buffer = (void*) buffer;
-	msg->count = count;
-	msg->type = MPI_INT;
-	return msg;
-}
-
-tsp_search_node_t* tsp_search_node_decode(message_t* message)
-{}

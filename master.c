@@ -4,6 +4,7 @@
 #include "tsp.h"
 #include "message.h"
 #include "list.h"
+#include "compute.h"
 #include "debug.h"
 
 tsp_t* input(int argc, char** argv);
@@ -54,22 +55,22 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	 * so that the resulting search nodes in the list are of equal size.
 	 */
 	int initial_node = 0;	// "initial_city"
-	tsp_search_t* search = tsp_search_new(problem, initial_node);
+	tsp_search_t* global_search = tsp_search_new(problem, initial_node);
 	int niterations = 1 + (problem->n - 1);
 	for (int i = 0; i < niterations; i++)
 	{
-		tsp_search_iterate(search, TSP_SEARCH_BREADTH_FIRST);
-		// VERBOSE: debug("master::pre_compute", "search->list->length = %d", search->list->length);
+		tsp_search_iterate(global_search, TSP_SEARCH_BREADTH_FIRST);
+		// VERBOSE: debug("master::pre_compute", "global_search->list->length = %d", global_search->list->length);
 	}
 
-	/** Round-robin the search nodes to the each process. */
+	/** Round-robin the global_search->list's nodes to the each process. */
 	list_t** all_lists = (list_t**) malloc(nproc * sizeof(list_t*));
 	for (int rank = 0; rank < nproc; rank++)
 		all_lists[rank] = list_new(NULL);
 	int rank = nproc - 1;
-	while (search->list->length)
+	while (global_search->list->length)
 	{
-		list_enqueue(all_lists[rank], list_dequeue(search->list));
+		list_enqueue(all_lists[rank], list_dequeue(global_search->list));
 		// VERBOSE: debug("master::round_robin", "all_lists[rank = %d]->length = %d", rank, all_lists[rank]->length);
 		if (--rank == -1)
 			rank = nproc - 1;
@@ -91,9 +92,9 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 		my_rank, MPI_COMM_WORLD);
 
 	message_buffer_to_string((message_t*) sendmsgs, strbuf);
-	debug("master::scatter::send", "sendmsgs->buffer = %s", strbuf);
+	debug("master::scatter", "sendmsgs->buffer = %s", strbuf);
 	messages_del(sendmsgs), sendmsgs = NULL;
-	debug("master::scatter::recv", "recvmsg->count = %d", recvmsg->count);
+	debug("master::scatter", "recvmsg->count = %d", recvmsg->count);
 
 	/** Scatterv each process' list to each process. */
 	messagesv_t* sendmsgsv = encode_all_lists(problem, nproc, all_lists);
@@ -105,24 +106,26 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 		sendmsgsv->buffer, sendmsgsv->counts, sendmsgsv->offsets, sendmsgsv->type,
 		recvmsg->buffer, recvmsg->count, recvmsg->type,
 		my_rank, MPI_COMM_WORLD);
+	tsp_search_t* my_local_search = tsp_search_decode(problem, recvmsg);
 
 	message_buffer_to_string((message_t*) sendmsgsv, strbuf);
-	debug("master::scatterv::send", "sendmsgsv->buffer = %s", strbuf);
+	debug("master::scatterv", "sendmsgsv->buffer = %s", strbuf);
 	messagesv_del(sendmsgsv), sendmsgsv = NULL;
 	message_buffer_to_string(recvmsg, strbuf);
-	debug("master::scatterv::recv", "recvmsg->buffer = %s", strbuf);
+	debug("master::scatterv", "recvmsg->buffer = %s", strbuf);
 	message_del(recvmsg), recvmsg = NULL;
 
-	// ---
+	/**
+	 * COMPUTE! Finally! hahahahaha
+	 * Here I have my_local_search populated with some tsp_search_nodes.
+	 * Let's expand these search tree nodes to find my_local_optimum.
+	 */
+	tsp_solution_t* my_local_optimum = compute(my_local_search);
 
-	// int size_of_encoded_tsp_search_node = ?;
-	// int size = size_of_encoded_tsp_search_state;
-	// int* all_tsp_search_states = malloc(?);
-	// for (search in expanded->list; rank in range(nproc))
-	// 	all_tsp_search_states[offsets[rank] + index*size] = tsp_search_encode(search);
+	char my_local_optimum_string[TSP_SOLUTION_STRING_MAX];
+	tsp_solution_to_string(my_local_optimum, my_local_optimum_string);
+	debug("master", "my_local_optimum = %s", my_local_optimum_string);
 
-	// tsp_solution_t* my_local_optimum = compute(problem, my_tsp_search_states);
-	//
 	// // TODO: encode a tsp_solution_t*
 	// tsp_solution_t* all_local_optima;
 	// MPI_Gather(recv: all_local_optima, send: my_local_optimum);
@@ -130,7 +133,8 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	// global_optimum = merge(all_local_optima)
 	// print(global_optimum)
 
-	tsp_search_del(search);
+	tsp_search_del(my_local_search);
+	tsp_search_del(global_search);
 	tsp_del(problem);
 }
 

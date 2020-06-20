@@ -81,9 +81,17 @@ void* list_dequeue(list_t* list)
 }
 
 void list_stack(list_t* list, void* data)
-{}
+{
+	list_node_t* new_node = (list_node_t*) malloc(sizeof(list_node_t));
+	new_node->data = data;
+	new_node->next = list->head;
+	list->head = new_node;
+	list->length++;
+	if (list->length == 0)
+		list->tail = new_node;
+}
 
 void* list_unstack(list_t* list)
 {
-	return NULL;
+	return list_dequeue(list);
 }

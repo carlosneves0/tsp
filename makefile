@@ -6,8 +6,11 @@ build: pcv arquivo-entrada.txt
 pcv: .bin/tsp
 	ln -sf ./.bin/tsp pcv
 
-.bin/tsp: .bin/list.o .bin/main.o .bin/master.o .bin/message.o .bin/slave.o .bin/tsp.o | .bin
-	mpicc .bin/list.o .bin/main.o .bin/master.o .bin/message.o .bin/slave.o .bin/tsp.o -o .bin/tsp -fopenmp
+.bin/tsp: .bin/compute.o .bin/list.o .bin/main.o .bin/master.o .bin/message.o .bin/slave.o .bin/tsp.o | .bin
+	mpicc .bin/compute.o .bin/list.o .bin/main.o .bin/master.o .bin/message.o .bin/slave.o .bin/tsp.o -o .bin/tsp -fopenmp
+
+.bin/compute.o: compute.h compute.c | .bin
+	mpicc -c compute.c -o .bin/compute.o -Wall
 
 .bin/list.o: list.h list.c | .bin
 	mpicc -c list.c -o .bin/list.o -Wall

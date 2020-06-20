@@ -3,6 +3,7 @@
 #include "slave.h"
 #include "message.h"
 #include "tsp.h"
+#include "compute.h"
 #include "debug.h"
 
 /** Declared and initialized in main.c. */
@@ -36,7 +37,7 @@ void slave(int my_rank, char* my_node, int my_ncores)
 		NULL, 0, MPI_INT,
 		&recvmsg->count, recvcount, recvtype,
 		MASTER_RANK, MPI_COMM_WORLD);
-	debug("slave::scatter::recv", "recvmsg->count = %d", recvmsg->count);
+	debug("slave::scatter", "recvmsg->count = %d", recvmsg->count);
 
 	/** Receive my_list_encoded from the master process. */
 	recvmsg->buffer = malloc(recvmsg->count * sizeof(int));
@@ -44,17 +45,26 @@ void slave(int my_rank, char* my_node, int my_ncores)
 		NULL, NULL, NULL, MPI_INT,
 		recvmsg->buffer, recvmsg->count, recvmsg->type,
 		MASTER_RANK, MPI_COMM_WORLD);
+	tsp_search_t* my_local_search = tsp_search_decode(problem, recvmsg);
 
 	message_buffer_to_string(recvmsg, strbuf);
-	debug("slave::scatterv::recv", "recvmsg->buffer = %s", strbuf);
+	debug("slave::scatterv", "recvmsg->buffer = %s", strbuf);
 	message_del(recvmsg), recvmsg = NULL;
 
-	// my_tsp_search_states = MPI_Scatterv()
+	/**
+	 * COMPUTE! Finally! hahahahaha
+	 * Here I have my_local_search populated with some tsp_search_nodes.
+	 * Let's expand these search tree nodes to find my_local_optimum.
+	 */
+	tsp_solution_t* my_local_optimum = compute(my_local_search);
 
-	// tsp_solution_t* my_local_optimum = compute(problem, my_tsp_search_states);
+	char my_local_optimum_string[TSP_SOLUTION_STRING_MAX];
+	tsp_solution_to_string(my_local_optimum, my_local_optimum_string);
+	debug("slave", "my_local_optimum = %s", my_local_optimum_string);
 
 	// TODO: encode a tsp_solution_t*
 	// MPI_Gather(recv: NULL, send: my_local_optimum);
 
+	tsp_search_del(my_local_search);
 	tsp_del(problem);
 }
