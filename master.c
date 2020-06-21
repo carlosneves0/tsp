@@ -10,10 +10,21 @@
 tsp_t* input(int argc, char** argv);
 messages_t* encode_all_lists_recvcounts(tsp_t* problem, int nproc, list_t** all_lists);
 messagesv_t* encode_all_lists(tsp_t* problem, int nproc, list_t** all_lists);
+messages_t* alloc_recvmsgs(tsp_t* problem, int nproc);
+tsp_solution_t** decode_all_local_optima(tsp_t* problem, int nproc, messages_t* msgs);
+void output(tsp_solution_t* solution);
 
 void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 {
 	tsp_t* problem = input(argc, argv);
+
+	if (problem->n < 3)
+	{
+		fprintf(stderr, "Invalid problem size N = %d < 3\n", problem->n);
+		// `MPI_Finalize();` wasn't enough here.
+		MPI_Abort(MPI_COMM_WORLD, 1);
+		exit(1);
+	}
 
 	int nproc;
 	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
@@ -126,13 +137,42 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	tsp_solution_to_string(my_local_optimum, my_local_optimum_string);
 	debug("master", "my_local_optimum = %s", my_local_optimum_string);
 
-	// // TODO: encode a tsp_solution_t*
-	// tsp_solution_t* all_local_optima;
-	// MPI_Gather(recv: all_local_optima, send: my_local_optimum);
+	/**
+	 * Gather all local_optima in the master process.
+	 */
+	sendmsg = tsp_solution_encode(problem, my_local_optimum);
+	messages_t* recvmsgs = alloc_recvmsgs(problem, nproc);
+	MPI_Gather(
+		sendmsg->buffer, sendmsg->count, sendmsg->type,
+		recvmsgs->buffer, recvmsgs->gather_count, recvmsgs->type,
+		my_rank, MPI_COMM_WORLD);
+	tsp_solution_t** all_local_optima = decode_all_local_optima(problem, nproc, recvmsgs);
 
-	// global_optimum = merge(all_local_optima)
-	// print(global_optimum)
+	message_buffer_to_string(sendmsg, strbuf);
+	debug("master::gather", "sendmsg->buffer = %s", strbuf);
+	message_del(sendmsg), sendmsg = NULL;
 
+	message_buffer_to_string((message_t*) recvmsgs, strbuf);
+	debug("master::gather", "recvmsgs->buffer = %s", strbuf);
+	messages_del(recvmsgs), recvmsgs = NULL;
+
+	/**************
+	 *    \||/    *
+	 *    \||/    *
+	 *  .<><><>.  *
+	 * .<><><><>. *
+	 * '<><><><>' *
+	 *  '<><><>'  *
+	 **************/
+	tsp_solution_t* global_optimum = all_local_optima[0];
+	for (int rank = 1; rank < nproc; rank++)
+		if (all_local_optima[rank]->cost < global_optimum->cost)
+			global_optimum = all_local_optima[rank];
+	output(global_optimum);
+
+	for (int rank = 0; rank < nproc; rank++)
+		tsp_solution_del(all_local_optima[rank]);
+	free(all_local_optima);
 	tsp_search_del(my_local_search);
 	tsp_search_del(global_search);
 	tsp_del(problem);
@@ -232,4 +272,55 @@ messagesv_t* encode_all_lists(tsp_t* problem, int nproc, list_t** all_lists)
 	msgv->counts = counts;
 	msgv->offsets = offsets;
 	return msgv;
+}
+
+messages_t* alloc_recvmsgs(tsp_t* problem, int nproc)
+{
+	const int N = problem->n;
+	const int TSP_SOLUTION_COUNT = 1 + N; // 1 int for cost + N ints for circuit
+
+	int count = nproc * TSP_SOLUTION_COUNT;
+	int* buffer = (int*) malloc(count * sizeof(int));
+	MPI_Datatype type = MPI_INT;
+	int gather_count = TSP_SOLUTION_COUNT;
+
+	messages_t* recvmsgs = (messages_t*) malloc(sizeof(messages_t));
+	recvmsgs->buffer = (void*) buffer;
+	recvmsgs->count = count;
+	recvmsgs->type = type;
+	recvmsgs->gather_count = gather_count;
+	return recvmsgs;
+}
+
+tsp_solution_t** decode_all_local_optima(tsp_t* problem, int nproc, messages_t* msgs)
+{
+	const int N = problem->n;
+	const int TSP_SOLUTION_COUNT = 1 + N; // 1 int for cost + N ints for circuit
+
+	tsp_solution_t** all_local_optima = (tsp_solution_t**) malloc(nproc * sizeof(tsp_solution_t*));
+	for (int rank = 0; rank < nproc; rank++)
+	{
+		all_local_optima[rank] = (tsp_solution_t*) malloc(sizeof(tsp_solution_t));
+
+		all_local_optima[rank]->problem = problem;
+
+		int* buffer = ((int*) msgs->buffer) + rank*TSP_SOLUTION_COUNT;
+
+		all_local_optima[rank]->cost = buffer[0];
+
+		int offset = 1;
+		all_local_optima[rank]->circuit = (int*) malloc(N * sizeof(int));
+		memcpy(all_local_optima[rank]->circuit, buffer + offset, N * sizeof(int));
+	}
+
+	return all_local_optima;
+}
+
+void output(tsp_solution_t* solution)
+{
+	const int N = solution->problem->n;
+	printf("%d\n", solution->cost);
+	for (int i = 0; i < N; i++)
+		printf("%d ", solution->circuit[i]);
+	printf("%d\n", solution->circuit[0]);
 }

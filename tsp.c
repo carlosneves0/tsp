@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <mpi.h>
 #include "tsp.h"
 
@@ -261,13 +262,23 @@ void tsp_solution_to_string(tsp_solution_t* solution, char* string)
 	// TODO: rewrite the many `sprintf` to be `snprintf`.
 }
 
-void tsp_solution_print(tsp_solution_t* solution)
+message_t* tsp_solution_encode(tsp_t* problem, tsp_solution_t* solution)
 {
-	printf("%d\n", solution->cost);
-	const int N = solution->problem->n;
-	for (int i = 0; i < N; i++)
-		printf("%d ", solution->circuit[i]);
-	printf("%d\n", solution->circuit[0]);
+	const int N = problem->n;
+	const int TSP_SOLUTION_COUNT = 1 + N; // 1 int for cost + N ints for circuit
+
+	int count = TSP_SOLUTION_COUNT;
+	int* buffer = (int*) malloc(count * sizeof(int));
+
+	buffer[0] = solution->cost;
+
+	int offset = 1;
+	memcpy(buffer + offset, solution->circuit, N * sizeof(int));
+
+	message_t* msg = message_new(MPI_INT);
+	msg->buffer = (void*) buffer;
+	msg->count = count;
+	return msg;
 }
 
 /*******************************************************************************
@@ -391,15 +402,15 @@ void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy)
 
 tsp_search_t* tsp_search_decode(tsp_t* problem, message_t* recvmsg)
 {
-	int encoded_tsp_search_node_count = (1 + problem->n);
-	const int NODE_COUNT = encoded_tsp_search_node_count;
+	const int N = problem->n;
+	const int TSP_SEARCH_NODE_COUNT = 1 + N; // 1 for depth + N for vist+notvist
 
 	list_t* search_list = list_new(NULL);
 	message_t tmp;
-	for (int i = 0; i < recvmsg->count; i += NODE_COUNT)
+	for (int i = 0; i < recvmsg->count; i += TSP_SEARCH_NODE_COUNT)
 	{
 		tmp.buffer = (void*) (((int*) recvmsg->buffer) + i);
-		tmp.count = NODE_COUNT;
+		tmp.count = TSP_SEARCH_NODE_COUNT;
 		tsp_search_node_t* search_node = tsp_search_node_decode(problem, &tmp);
 		list_enqueue(search_list, (void*) search_node);
 	}
@@ -408,5 +419,15 @@ tsp_search_t* tsp_search_decode(tsp_t* problem, message_t* recvmsg)
 	search->problem = problem;
 	search->optimum = NULL;
 	search->list = search_list;
+
+	if (recvmsg->count == 0)
+	{
+		search->optimum = (tsp_solution_t*) malloc(sizeof(tsp_solution_t));
+		search->optimum->problem = problem;
+		search->optimum->cost = INT_MAX;
+		search->optimum->circuit = (int*) malloc(N * sizeof(int)); // this solution should never be printed.
+		memset(search->optimum->circuit, 0, N * sizeof(int));
+	}
+
 	return search;
 }

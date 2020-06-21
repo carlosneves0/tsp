@@ -62,8 +62,18 @@ void slave(int my_rank, char* my_node, int my_ncores)
 	tsp_solution_to_string(my_local_optimum, my_local_optimum_string);
 	debug("slave", "my_local_optimum = %s", my_local_optimum_string);
 
-	// TODO: encode a tsp_solution_t*
-	// MPI_Gather(recv: NULL, send: my_local_optimum);
+	/**
+	 * Gather all local_optima in the master process.
+	 */
+	message_t* sendmsg = tsp_solution_encode(problem, my_local_optimum);
+	MPI_Gather(
+		sendmsg->buffer, sendmsg->count, sendmsg->type,
+		NULL, 0, MPI_INT,
+		MASTER_RANK, MPI_COMM_WORLD);
+
+	message_buffer_to_string(sendmsg, strbuf);
+	debug("slave::gather", "sendmsg->buffer = %s", strbuf);
+	message_del(sendmsg), sendmsg = NULL;
 
 	tsp_search_del(my_local_search);
 	tsp_del(problem);

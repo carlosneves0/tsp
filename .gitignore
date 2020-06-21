@@ -3,3 +3,6 @@
 /pcv
 /arquivo-entrada.txt
 /__vendor__
+/stderr
+/stdout
+/std*

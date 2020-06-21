@@ -30,6 +30,7 @@ struct messages
 	MPI_Datatype type;
 	/* ^^^ backwards compatible with message_t */
 	int scatter_count;
+	int gather_count;
 };
 typedef struct messages messages_t;
 void messages_del(messages_t* messages);

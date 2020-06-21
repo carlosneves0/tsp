@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := build
-.PHONY: build arquivo-entrada.txt clean exec debug cluster-topology genprobl _exec
+.PHONY: build arquivo-entrada.txt clean exec debug cluster-topology genproblems _exec
 
+# @ANYWHERE
 build: pcv arquivo-entrada.txt
 
 pcv: .bin/tsp
@@ -41,28 +42,38 @@ pcv: .bin/tsp
 .bin:
 	mkdir -p .bin
 
-ifndef p
-p := 0
+ifndef n
+n := 3
 endif
-arquivo-entrada.txt: __problems__/$(p)/input
-	ln -sf ./__problems__/$(p)/input arquivo-entrada.txt
+arquivo-entrada.txt: __problems__/$(n)/input
+	ln -sf ./__problems__/$(n)/input arquivo-entrada.txt
 
+__problems__/$(n)/input: | __problems__/$(n)
+	bash __scripts__/genproblem.bash $(n) > __problems__/$(n)/input
+
+__problems__/$(n):
+	mkdir -p __problems__/$(n)
+
+# @ANYWHERE
 clean:
 	rm -rf .bin
 
+# @CLUSTER
 exec: nodes.txt .bin/tsp arquivo-entrada.txt
 	mpiexec --map-by ppr:1:node --hostfile nodes.txt .bin/tsp arquivo-entrada.txt
 
+# @CLUSTER
 debug: nodes.txt .bin/tsp.debug arquivo-entrada.txt
 	mpiexec --map-by ppr:1:node --hostfile nodes.txt .bin/tsp.debug arquivo-entrada.txt
 
+# @CLUSTER
 cluster-topology:
 	bash __scripts__/cluster-topology.bash
 
-n := $(n)
-genprobl:
-	@exec bash __scripts__/genprobl.bash $(n)
+# @ANYWHERE
+genproblem:
+	@exec bash __scripts__/genproblems.bash $(n)
 
-# LOCAL exec
+# @HOME
 _exec: .bin/tsp.debug arquivo-entrada.txt
 	mpiexec --np 3 --oversubscribe .bin/tsp.debug arquivo-entrada.txt

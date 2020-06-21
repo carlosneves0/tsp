@@ -51,7 +51,8 @@ tsp_solution_t* tsp_solution_new(tsp_t* problem, tsp_search_node_t* search_node)
 void tsp_solution_del(tsp_solution_t* solution);
 extern const int TSP_SOLUTION_STRING_MAX;
 void tsp_solution_to_string(tsp_solution_t* solution, char* string);
-void tsp_solution_print(tsp_solution_t* solution);
+message_t* tsp_solution_encode(tsp_t* problem, tsp_solution_t* solution);
+message_t* tsp_solution_decode(tsp_t* problem, tsp_solution_t* solution);
 
 /**
  * tsp_search_t
@@ -75,19 +76,5 @@ tsp_search_t* tsp_search_new(tsp_t* problem, int initial_node);
 void tsp_search_del(tsp_search_t* search);
 void tsp_search_iterate(tsp_search_t* search, tsp_search_strategy_t strategy);
 tsp_search_t* tsp_search_decode(tsp_t* problem, message_t* recvmsg);
-
-
-
-
-
-
-// OLD: void tsp_expand(tsp_t* problem, int depth = -1);
-// OLD: int tsp_cost(tsp_t* problem, int u, int v);
-
-// OLD: tsp_search_node_t* tsp_search_node_new(tsp_search_node_t* node, int x);
-// OLD: tsp_search_node_t* tsp_search_node_cpy(tsp_search_node_t* node);
-// OLD: void tsp_search_node_del(tsp_search_node_t* node);
-// OLD: void tsp_search_node_print(tsp_search_node_t* node);
-// OLD: int* tsp_search_node_children(tsp_search_node_t* node);
 
 #endif
