@@ -75,5 +75,8 @@ genproblem:
 	@exec bash __scripts__/genproblems.bash $(n)
 
 # @HOME
+ifndef p
+p := 3
+endif
 _exec: .bin/tsp.debug arquivo-entrada.txt
-	mpiexec --np 2 --oversubscribe .bin/tsp.debug arquivo-entrada.txt
+	mpiexec --np $(p) --oversubscribe .bin/tsp.debug arquivo-entrada.txt
