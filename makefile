@@ -72,7 +72,7 @@ cluster-topology:
 
 # @ANYWHERE
 genproblem:
-	@exec bash __scripts__/genproblems.bash $(n)
+	@exec bash __scripts__/genproblem.bash $(n)
 
 # @HOME
 ifndef p

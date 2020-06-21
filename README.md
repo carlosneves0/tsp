@@ -35,6 +35,20 @@ cat stderr | grep bcast
 cat stderr | grep -E 'scatter\b'
 ```
 
+## `make cluster-topology`
+
+Prints a table with CPU, number of cores and RAM for each node of the cluster.
+
+## `make genproblem`
+
+Print a new problem of size `n` (default is `3`) to stdout.
+
+```
+make genproblem n=15
+```
+
+All generated problems have the optimal solution `0, 1, 2, ..., N-1, 0`.
+
 ### Run **locally** with DEBUG output: `make _exec`
 
 This will use `mpiexec`'s `--oversubscribe` flag to force the creation of `p` processes. By default `p` is 3. But can be overridden with:
