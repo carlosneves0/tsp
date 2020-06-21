@@ -48,6 +48,7 @@ struct tsp_solution
 };
 typedef struct tsp_solution tsp_solution_t;
 tsp_solution_t* tsp_solution_new(tsp_t* problem, tsp_search_node_t* search_node);
+tsp_solution_t* tsp_solution_cpy(tsp_solution_t* src);
 void tsp_solution_del(tsp_solution_t* solution);
 extern const int TSP_SOLUTION_STRING_MAX;
 void tsp_solution_to_string(tsp_solution_t* solution, char* string);

@@ -131,7 +131,7 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	 * Here I have my_local_search populated with some tsp_search_nodes.
 	 * Let's expand these search tree nodes to find my_local_optimum.
 	 */
-	tsp_solution_t* my_local_optimum = compute(my_local_search);
+	tsp_solution_t* my_local_optimum = compute(my_local_search, my_ncores);
 
 	char my_local_optimum_string[TSP_SOLUTION_STRING_MAX];
 	tsp_solution_to_string(my_local_optimum, my_local_optimum_string);

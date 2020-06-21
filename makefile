@@ -13,7 +13,7 @@ pcv: .bin/tsp
 	mpicc .bin/compute.o .bin/list.o .bin/main.debug.o .bin/master.debug.o .bin/message.o .bin/slave.debug.o .bin/tsp.o -o .bin/tsp.debug -fopenmp
 
 .bin/compute.o: compute.h compute.c | .bin
-	mpicc -c compute.c -o .bin/compute.o -Wall
+	mpicc -c compute.c -o .bin/compute.o -fopenmp -Wall
 
 .bin/list.o: list.h list.c | .bin
 	mpicc -c list.c -o .bin/list.o -Wall
@@ -76,4 +76,4 @@ genproblem:
 
 # @HOME
 _exec: .bin/tsp.debug arquivo-entrada.txt
-	mpiexec --np 3 --oversubscribe .bin/tsp.debug arquivo-entrada.txt
+	mpiexec --np 2 --oversubscribe .bin/tsp.debug arquivo-entrada.txt

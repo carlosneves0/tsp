@@ -206,6 +206,19 @@ tsp_solution_t* tsp_solution_new(tsp_t* problem, tsp_search_node_t* search_node)
 	return solution;
 }
 
+tsp_solution_t* tsp_solution_cpy(tsp_solution_t* src)
+{
+	if (!src)
+		return NULL;
+	const int N = src->problem->n;
+	tsp_solution_t* cpy = (tsp_solution_t*) malloc(sizeof(tsp_solution_t));
+	cpy->problem = src->problem;
+	cpy->cost = src->cost;
+	cpy->circuit = (int*) malloc(N * sizeof(int));
+	memcpy(cpy->circuit, src->circuit, N * sizeof(int));
+	return cpy;
+}
+
 void tsp_solution_del(tsp_solution_t* solution)
 {
 	free(solution->circuit);

@@ -19,6 +19,6 @@ extern char my_node[MPI_MAX_PROCESSOR_NAME];
 * Debug macro to fprintf stuff to stderr.
 */
 #define debug(tag, fmt, ...) \
-	do { if (__DEBUG__) fprintf(stderr, "[%s][%d][" tag "] " fmt "\n", my_node, my_rank, __VA_ARGS__); } while (0)
+	do { if (__DEBUG__) fprintf(stderr, "[%s][%d][" tag "] " fmt "\n", my_node, my_rank, __VA_ARGS__); fflush(stderr); } while (0)
 
 #endif
