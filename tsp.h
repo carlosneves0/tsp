@@ -12,7 +12,6 @@ struct tsp
 {
 	int n;
 	int** cost;
-	int initial_node;
 };
 typedef struct tsp tsp_t;
 tsp_t* tsp_new(FILE* stream);
