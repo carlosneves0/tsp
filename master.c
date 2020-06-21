@@ -74,7 +74,7 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 		// VERBOSE: debug("master::pre_compute", "global_search->list->length = %d", global_search->list->length);
 	}
 
-	/** Round-robin the global_search->list's nodes to the each process. */
+	/** Round-robin the global_search->list's nodes to each process. */
 	list_t** all_lists = (list_t**) malloc(nproc * sizeof(list_t*));
 	for (int rank = 0; rank < nproc; rank++)
 		all_lists[rank] = list_new(NULL);
@@ -130,6 +130,8 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 	 * COMPUTE! Finally! hahahahaha
 	 * Here I have my_local_search populated with some tsp_search_nodes.
 	 * Let's expand these search tree nodes to find my_local_optimum.
+	 * This function `compute` will use OpenMP to take advantage of the
+	 * multicore architecture of the hardware.
 	 */
 	tsp_solution_t* my_local_optimum = compute(my_local_search, my_ncores);
 
