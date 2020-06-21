@@ -17,7 +17,6 @@ void output(tsp_solution_t* solution);
 void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 {
 	tsp_t* problem = input(argc, argv);
-
 	if (problem->n < 3)
 	{
 		fprintf(stderr, "Invalid problem size N = %d < 3\n", problem->n);
@@ -25,6 +24,7 @@ void master(int argc, char** argv, int my_rank, char* my_node, int my_ncores)
 		MPI_Abort(MPI_COMM_WORLD, 1);
 		exit(1);
 	}
+	debug("master", "N = %d", problem->n);
 
 	int nproc;
 	MPI_Comm_size(MPI_COMM_WORLD, &nproc);
