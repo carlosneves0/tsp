@@ -1,51 +1,44 @@
 # tsp
+
 The Traveling Salesman Problem solved in C using MPI and OpenMP
 
-TODO: rewrite this.
+## Compile: `make`
+
+## Run in the cluster: `make exec`
+
+This will run with a problem of size N = 3. Change the size with:
 
 ```
---- PSEUDOCODE ---
-if (my_rank == MPI_MASTER)
-{
-  tsp_t* problem = input(argc, argv);
+make exec n=4
+```
 
-  nproc = ask_mpi();
+```
+make exec n=10
+```
 
-  spawn(nproc);
+N = 14 is the biggest problem we solved. It took a few minutes using all the cluster's resources.
 
-  ncores = gather_ncores();
+All problems are generated to have the optimal solution: `0, 1, 2, ..., N-1, 0`.
 
-  bcast(cost_matrix);
+## Run in the cluster with DEBUG output: `make debug`
 
-  tsp_t* subproblems = split(problem, nproc, ncores);
+Like `make exec` we can pick the size of the problem: `make debug n=10`.
 
-  tsp_t* my_subproblems = scatterv(subproblems);
+All debug output is piped to the `stderr` stream. A useful way to debug the execution of this program is to:
 
-  path_t* my_subsolutions;
+```
+make debug 2> stderr
+cat stderr | grep main
+cat stderr | grep master
+cat stderr | grep slave
+cat stderr | grep bcast
+cat stderr | grep -E 'scatter\b'
+```
 
-  #pragma omp shit
-  my_subsolutions[i] = tsp_solve(my_subproblems[i]);
+### Run **locally** with DEBUG output: `make _exec`
 
-  path_t* all_subsolutions = gatherv(my_subsolutions);
+This will use `mpiexec`'s `--oversubscribe` flag to force the creation of `p` processes. By default `p` is 3. But can be overridden with:
 
-  path_t* solution = merge(all_subsolutions);
-
-  output(solution);
-}
-else
-{
-  gather_ncores();
-
-  bcast(cost_matrix);
-
-  tsp_t* my_subproblems = scatterv(subproblems);
-
-  path_t* my_subsolutions;
-
-  #pragma omp shit
-  my_subsolutions[i] = tsp_solve(my_subproblems[i]);
-
-  gatherv(my_subsolutions);
-}
---- PSEUDOCODE ---
+```
+make _exec p=7
 ```
